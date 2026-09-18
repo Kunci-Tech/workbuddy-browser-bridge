@@ -65,7 +65,7 @@ To have an agent do the entire setup for you, use the copy-paste prompt in [AGEN
 
 Just ask in plain language:
 
-- "Open google.com and search for best coffee in Banyuwangi"
+- "Open google.com and search for the best coffee nearby"
 - "Tag the buttons on this page and click the one labelled Save"
 - "Screenshot my Google Ads campaigns table"
 - "Fill the contact form with my details"

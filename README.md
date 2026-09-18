@@ -102,6 +102,9 @@ Those two states look identical to an agent reading raw output, and conflating t
 - [Quick install](#quick-install)
 - [Install with AI](#install-with-ai)
 - [Why Browser Bridge?](#why-browser-bridge)
+  - [What makes this hackathon-worthy](#what-makes-this-hackathon-worthy)
+  - [Bundled Chromium vs. your own Chrome](#bundled-chromium-vs-your-own-chrome)
+  - [Why bundled browsers get blocked at sign-in](#why-bundled-browsers-get-blocked-at-sign-in)
 - [How It Works — The Architecture](#how-it-works--the-architecture)
   - [The Big Picture](#the-big-picture)
   - [Layer 1: The Chrome Extension](#layer-1-the-chrome-extension)
@@ -144,6 +147,57 @@ Every AI agent that needs browser access faces the same tradeoff: pay $200/month
 | **Safety guardrails** | Hover & confirm red alert | No | No | No |
 | **Dependencies** | Zero npm packages | — | — | Dozens |
 | **Cost** | Free & unlimited (MIT) | $20/month | $200/month | Free tool |
+
+### Bundled Chromium vs. your own Chrome
+
+Most local agents ship a browser of their own — a bundled Chromium that the agent
+downloads, launches and drives. That is a perfectly reasonable tool for public pages.
+It falls apart the moment a sign-in is involved.
+
+| | Bundled Chromium (e.g. `agent-browser`) | Browser Bridge |
+| :--- | :--- | :--- |
+| **Which browser** | Its own download (~500 MB), separate profile | The Chrome you already run |
+| **Session state** | None — fresh profile, no cookies | Your cookies, tabs and logins |
+| **Signing in** | Log in from scratch, every session | Already signed in — no login step exists |
+| **OAuth / Google sign-in** | Frequently blocked outright | Never triggered — the session already exists |
+| **CAPTCHA / 2FA** | Dead end | Pauses for a human handshake, then resumes |
+| **What you see** | A screenshot, afterwards | The cursor moving, live in your own window |
+| **Setup** | Zero | Trust + load extension, once |
+| **Blast radius** | Sandboxed — cannot touch your accounts | Your real accounts and real data |
+
+#### Why bundled browsers get blocked at sign-in
+
+A freshly launched Chromium is a browser Google has never seen. It has no history, no
+cookies, and — under most automation frameworks — it announces itself with
+`--enable-automation` and a CDP-driven fingerprint. Google's risk engine reads that
+combination as a new, unattended device and may respond by:
+
+- refusing the sign-in with **"This browser or app may not be secure"**;
+- blocking the **OAuth consent screen** for automated user agents;
+- demanding an **extra verification round** on an account that has been signed in for
+  months on your real browser;
+- failing **passkey / WebAuthn** prompts, which need a platform authenticator a bundled
+  browser does not have.
+
+You can fight this with stealth patches, spoofed user agents and a persisted profile
+directory. It is a permanent maintenance burden, it may breach the terms of service of
+the site you are automating, and it still leaves you typing real credentials into a
+script.
+
+**Browser Bridge avoids the problem entirely: it never logs in.** It attaches to a Chrome
+session that is already authenticated, so no sign-in flow runs, no consent screen is
+reached, and no credential is ever handed to a script. The OAuth tokens you already hold
+are simply *used* — through the browser that legitimately holds them.
+
+#### Rule of thumb
+
+- **Behind a login → use the bridge.** Dashboards, ad platforms, admin panels, analytics,
+  anything with an OAuth flow, 2FA or a passkey.
+- **Public page → either works.** For scraping and screenshots of anonymous content, a
+  bundled browser is lighter, needs no setup, and cannot touch your accounts.
+
+If you are signed in nowhere, the two are equivalent. The moment a session exists, only
+the bridge can use it.
 
 ---
 
