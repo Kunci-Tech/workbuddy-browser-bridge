@@ -3,6 +3,7 @@ const { spawn } = require("child_process");
 const http = require("http");
 const path = require("path");
 const browser = require("../bridge/client.js");
+const { waitForPort } = require("./lib/wait-for-server");
 
 const TEST_PORT = 8998;
 const serverPath = path.resolve(__dirname, "../bridge/server.js");
@@ -37,12 +38,31 @@ function cleanup(code) {
   process.exit(code);
 }
 
+let serverOutput = "";
+serverProcess.stdout.on("data", data => { serverOutput += data.toString(); });
+serverProcess.stderr.on("data", data => { serverOutput += data.toString(); });
+
 serverProcess.on("error", (err) => {
   console.error("Failed to start test server:", err.message);
   cleanup(1);
 });
 
-setTimeout(() => {
+// Wait for the child to bind the port instead of guessing with a sleep. A fixed
+// delay turns "this machine was busy for 600ms" into "the server is broken",
+// because a refused connection looks exactly like a real regression.
+waitForPort(TEST_PORT).then((ready) => {
+  if (!ready) {
+    console.error(`Bridge server never listened on port ${TEST_PORT}`);
+    console.error("Server output:\n", serverOutput);
+    return cleanup(1);
+  }
+
+  // Startup is proven, so the watchdog now measures the request only.
+  setTimeout(() => {
+    console.error("Test timed out");
+    cleanup(1);
+  }, 4000);
+
   // Test omnibar prompt endpoint
   const postData = JSON.stringify({ prompt: "Navigate to google.com", url: "https://example.com" });
   const req = http.request({
@@ -76,14 +96,10 @@ setTimeout(() => {
 
   req.on("error", (e) => {
     console.error("HTTP request failed:", e.message);
+    console.error("Server output:\n", serverOutput);
     cleanup(1);
   });
 
   req.write(postData);
   req.end();
-}, 500);
-
-setTimeout(() => {
-  console.error("Test timed out");
-  cleanup(1);
-}, 4000);
+});
