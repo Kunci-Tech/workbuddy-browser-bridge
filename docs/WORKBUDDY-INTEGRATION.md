@@ -81,7 +81,7 @@ Just ask in plain language:
 | `browser_focus_tab` | `urlContains` \| `titleContains` \| `tabId` | Brings a tab to the front |
 | `browser_navigate` | `url`, `tabId?` | Opens a URL |
 | `browser_tag_elements` | — | Numbered Set-of-Mark badges |
-| `browser_click` | `badgeId` \| `text` \| `selector` \| `x`+`y`, `actionLabel?`, `force?` | Prefer `badgeId` |
+| `browser_click` | `badgeId` \| `text` \| `selector` \| `x`+`y`, `actionLabel?`, `force?` | Prefer `badgeId` for on-screen targets; `text` works below the fold |
 | `browser_type` | `text` | Click the field first |
 | `browser_screenshot` | `format?` | Returns a PNG image |
 | `browser_get_dom` | — | Title, url, headings, elements |
@@ -93,6 +93,13 @@ Just ask in plain language:
 Screenshot-based clicking guesses pixel coordinates and misses on dense tables.
 Tagging assigns stable numbers to real DOM elements, so the click lands on the
 element itself — no coordinate drift, and far fewer image tokens.
+
+Badges are only created for elements **currently in the viewport**, so they cannot
+reach anything below the fold. For those, target by `text` instead: the element is
+scrolled into view, the scroll is allowed to settle, and the click point is verified
+to actually reach the element before the click fires. If nothing the target owns is
+clickable — a sticky header or modal covers it — the call reports that rather than
+clicking whatever happens to be underneath.
 
 ---
 
