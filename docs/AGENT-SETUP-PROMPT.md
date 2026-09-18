@@ -26,23 +26,24 @@ If it is already cloned somewhere on this machine, use that copy instead of clon
    Then read the warnings properly instead of assuming they are all the expected
    "not connected yet" ones. doctor separates "the install is broken" from "the human
    has not finished yet", and names the specific blocker:
-     - "WorkBuddy session" -> the app started before the config was written. It reads
-       mcp.json only at startup, so the server is not listed and cannot be trusted
-       until it is restarted. Tell me to restart, and do not try to work around it.
+     - "MCP trust" -> the server has not been approved yet, so WorkBuddy is not exposing
+       it. This is the usual blocker, and it is not a broken install.
      - "Chrome extension" -> tells you which Chrome profile has the extension loaded,
        or that it is missing, disabled, or that a different bridge extension is loaded.
        Quote the exact path it prints for the Load unpacked step.
      - "Live bridge" -> expected until the server is trusted; it goes away on its own.
 5. Tell me the things only I can do, and wait for my confirmation:
-   a) Fully quit and relaunch WorkBuddy, if doctor warned about the session.
-   b) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
-      click Trust on "browser-bridge".
-   c) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
+   a) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
+      click Trust on "browser-bridge". This is the gate; nothing is exposed until then.
+   b) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
       select the folder doctor printed (the one with manifest.json). It must be loaded
       in the Chrome profile I actually browse in, because an unpacked extension is only
       active in the profile that has it.
-6. After I confirm, run npm run doctor again, then call browser_status. It should report
-   connected: true.
+6. After I confirm, tell me to start a NEW conversation and call browser_status there.
+   A conversation that was already open does not pick up a newly granted approval. It
+   should report connected: true. If it still does not, do not reinstall anything: the
+   bridge also speaks plain HTTP on port 8766, and docs/TROUBLESHOOTING.md explains how
+   to drive Chrome that way instead.
 
 Notes:
 - Do not start a long-running server yourself. Once the MCP server is trusted, WorkBuddy
@@ -62,13 +63,15 @@ Notes:
 
 Three steps in this install are impossible for an agent:
 
-- **Restarting WorkBuddy** is a lifecycle action on the very app hosting the agent.
-- **Trusting the MCP server** happens in WorkBuddy's own UI. No file write can pre-authorize it.
+- **Trusting the MCP server** happens in WorkBuddy's own UI. No file write can pre-authorize it, and nothing is exposed until it happens.
 - **Loading the extension** happens in `chrome://extensions`, a page extensions cannot script.
+- **Starting a new conversation** is a UI action, and it is the step that actually delivers the tools — see below.
 
 An agent that doesn't know this will burn turns trying to automate them, or worse, will assume the whole install failed. The prompt names all three explicitly and tells the agent to **stop and wait** at step 5.
 
-The restart is the least obvious and the easiest to miss. WorkBuddy reads `~/.workbuddy-ai/mcp.json` once, at startup. Register the bridge while the app is already running and the server is not in the in-memory list at all — it never shows up under custom connectors, so there is nothing to click Trust on, and starting a new chat does not help. `doctor` detects this by comparing the app's last start time against the config's mtime and reports it as a `WorkBuddy session` warning.
+The third one is the least obvious. WorkBuddy resolves MCP servers per conversation, so a config entry is picked up without restarting the app — but the *approval* is not retroactive. A conversation already open when you click Trust will never see the tools, however long you wait and however many times you re-run `doctor`. "It still doesn't work" very often just means "open a new chat".
+
+Note what is **not** on this list: restarting WorkBuddy. It is the natural thing to try and it does no harm, but it is not what gates the server — trust is. `doctor` reports the approval directly as `MCP trust` rather than inferring anything from timing, so there is no guesswork involved.
 
 ### `npm run doctor` gives the agent a verdict, not a log dump
 

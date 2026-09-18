@@ -6,10 +6,10 @@
 npm run doctor
 ```
 
-One command that checks the whole chain — Node version, project files, MCP registration, whether WorkBuddy has been restarted since the config was written, a live MCP handshake, and whether Chrome actually has the extension loaded and enabled — then prints a verdict:
+One command that checks the whole chain — Node version, project files, MCP registration, whether the server has actually been trusted, a live MCP handshake, and whether Chrome actually has the extension loaded and enabled — then prints a verdict:
 
 - **PASS** — verified working
-- **WARN** — fine, but a manual step hasn't happened yet (restarting WorkBuddy, trusting the server, loading the extension)
+- **WARN** — fine, but a manual step hasn't happened yet (trusting the server, loading the extension, starting a new conversation)
 - **FAIL** — genuinely broken. Exits with code 1 and prints the exact fix command.
 
 Run this before reading any further. Most issues are answered by its output.
@@ -64,27 +64,32 @@ Or just open the extension popup — the status pill reads **Connected**.
 
 ### The browser tools don't appear in WorkBuddy
 
-Work through these in order — the first one is the most common and the least obvious.
+Work through these in order — the first is the most common and the least obvious.
 
-1. **Restart WorkBuddy.** WorkBuddy reads `~/.workbuddy-ai/mcp.json` once, at startup. If
-   you registered the bridge while the app was already running, the server is not in its
-   in-memory list: it will not appear under custom connectors, so there is nothing to
-   Trust, and starting a new chat does not help. Fully quit and relaunch, then look again.
-   `npm run doctor` reports this as a `WorkBuddy session` warning.
-2. Confirm the config entry exists:
+1. **Start a new conversation.** The `browser_*` tools are injected when a conversation
+   starts. A conversation that was already open when you trusted the server will never
+   see them, no matter how long you wait or how many times you re-run `doctor`. This is
+   by far the most common cause, and it is easy to miss precisely because everything
+   else looks correct.
+2. **Check the trust landed:**
+   ```bash
+   npm run doctor
+   ```
+   Look for the `MCP trust` line. `PASS  MCP trust  browser-bridge approved` means
+   WorkBuddy has approved it. A warning means it has not — an MCP server stays dormant
+   until it is explicitly trusted, however correct the config is.
+3. **Trust it if it is not approved** — WorkBuddy → connector management → custom
+   connectors (top-right) → **Trust** on `browser-bridge`. Then go back to step 1.
+4. **Confirm the config entry exists:**
    ```bash
    cat ~/.workbuddy-ai/mcp.json
    ```
-   You should see a `browser-bridge` entry under `mcpServers`.
-3. Re-run the installer if it's missing:
+   You should see a `browser-bridge` entry under `mcpServers`. If it is missing:
    ```bash
    npm run install-mcp
    ```
-4. **Trust the server.** New MCP servers stay disabled until you explicitly trust them:
-   WorkBuddy → connector management → custom connectors (top-right) → **Trust** on
-   `browser-bridge`.
-5. **Reload the session.** The `browser_*` tools only register once the server is trusted
-   *and* the session reloads. If they are still missing, this is what remains.
+5. **Still nothing?** Drive Chrome over HTTP instead — it bypasses the MCP layer entirely
+   and takes seconds. See [Driving Chrome without the MCP tools](#driving-chrome-without-the-mcp-tools).
 
 ### The MCP server exits immediately
 
@@ -143,7 +148,81 @@ BRIDGE_NODE=/opt/homebrew/bin/node npm run install-mcp
 | **OFF** (grey) | Extension loaded, bridge server not running — start it |
 | blank | Service worker is waking up / reconnecting |
 
-A grey **OFF** badge is normal when the server is stopped. It is not an error state.
+### "My badge says OFF — is it broken?"
+
+Almost certainly not. **OFF is the correct state before first use.**
+
+The bridge is not a background daemon. WorkBuddy spawns it on demand, when a browser tool
+is first called, and stops it afterwards. So in the window between loading the extension
+and actually asking WorkBuddy to browse, there is nothing for the extension to connect to,
+and it correctly reports **OFF**.
+
+It turns green **WOR** the moment the bridge comes up. If you want to watch that happen,
+run the bridge yourself in one terminal:
+
+```bash
+./start-bridge.sh
+```
+
+The badge should flip to **WOR** within a second or two. `Ctrl-C` stops it and the badge
+returns to **OFF**. That is the whole lifecycle — nothing is wrong.
+
+The one case worth acting on: if the badge stays **blank** indefinitely, the extension's
+service worker is not waking up. Reload it from `chrome://extensions`.
+
+---
+
+## Driving Chrome without the MCP tools
+
+The bridge exposes a plain HTTP API alongside MCP, so you are never actually blocked on
+the MCP layer. This is the quickest way to prove the extension works, and a perfectly
+good way to drive Chrome when the tools are not available.
+
+Start the bridge:
+
+```bash
+./start-bridge.sh
+```
+
+Check that an extension has dialled in:
+
+```bash
+curl -s http://127.0.0.1:8766/status
+```
+
+```json
+{"status":"ok","connected":true,"port":8766,"agent":"workbuddy",
+ "agents":{"workbuddy":true,"antigravity":true}}
+```
+
+Then send commands to the same endpoint the MCP tools use internally:
+
+```bash
+# navigate
+curl -s -X POST http://127.0.0.1:8766/command \
+  -H "Content-Type: application/json" \
+  -d '{"command":"navigate","params":{"url":"https://www.google.com"},"agentId":"workbuddy"}'
+# {"result":{"navigated":true,"tabId":911564028,"url":"https://www.google.com"}}
+
+# list tabs
+curl -s -X POST http://127.0.0.1:8766/command \
+  -H "Content-Type: application/json" \
+  -d '{"command":"list_tabs","params":{},"agentId":"workbuddy"}'
+```
+
+`agentId` is `workbuddy` (port 8766) or `antigravity` (port 8765). The remaining commands
+mirror the MCP tool names — `click`, `click_badge`, `type`, `screenshot`, `tag_elements`,
+`clear_tags`, `get_dom`, `detect_challenge`. `screenshot` returns base64 in
+`result.screenshot`.
+
+One gotcha: `/status` can briefly report `workbuddy:false, antigravity:true` while the
+extensions are still dialling in. Re-poll before concluding anything.
+
+Stop the bridge with `Ctrl-C`, or:
+
+```bash
+lsof -ti :8766 | xargs kill
+```
 
 ---
 
@@ -215,10 +294,10 @@ you must reload the extension:
 2. Click the reload icon on the Browser Bridge card
 3. Refresh any open tabs so the new content script is injected
 
-Changes to `mcp/server.js` or `bridge/*.js` need the bridge restarted instead. In MCP
-mode WorkBuddy owns that process, so the simplest path is to restart WorkBuddy (or
-run `node mcp/server.js` by hand while developing). Extension reloads are independent
-of bridge restarts.
+Changes to `mcp/server.js` or `bridge/*.js` need the bridge process restarted instead. In
+MCP mode WorkBuddy owns that process, so start a new conversation (or run
+`node mcp/server.js` by hand while developing). Extension reloads are independent of
+bridge restarts.
 
 ---
 
