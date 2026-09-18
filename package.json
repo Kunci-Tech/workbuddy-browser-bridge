@@ -1,0 +1,44 @@
+{
+  "name": "workbuddy-browser-bridge",
+  "version": "2.0.0",
+  "description": "Universal visual AI browser controller for WorkBuddy AI, Antigravity IDE, and extensible AI agents. Native Chrome DevTools Protocol (CDP), Set-of-Mark tagging, animated laser cursor, safety guardrails, multi-agent registry.",
+  "main": "bridge/client.js",
+  "bin": {
+    "browser-bridge": "./bridge/server.js",
+    "browser-bridge-mcp": "./mcp/server.js"
+  },
+  "scripts": {
+    "start": "node bridge/server.js",
+    "mcp": "node mcp/server.js",
+    "install-mcp": "node install/install-mcp.js",
+    "test": "node test/sanitize-check.test.js && node test/bridge-api.test.js && node test/features.test.js && node test/multi-agent.test.js && node test/mcp.test.js && node test/mcp-e2e.test.js",
+    "demo": "node bridge/demo.js",
+    "status": "node bridge/test-connection.js"
+  },
+  "keywords": [
+    "workbuddy",
+    "antigravity",
+    "chrome-extension",
+    "cdp",
+    "browser-automation",
+    "ai-agent",
+    "multi-agent",
+    "devtools-protocol",
+    "visual-cursor",
+    "local-ai",
+    "hackathon"
+  ],
+  "author": "Rahmat Ramadhan Irianto <rahmat.ramadhaniriyanto@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kunci-Tech/workbuddy-browser-bridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Kunci-Tech/workbuddy-browser-bridge/issues"
+  },
+  "homepage": "https://github.com/Kunci-Tech/workbuddy-browser-bridge#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

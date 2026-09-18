@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# WorkBuddy local state
+.workbuddy-ai/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

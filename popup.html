@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en" data-page-node-id="twZgvVmAk7NhDOadJOC7Ij">
+<head data-page-node-id="hzyppeIR1kGOgBMrVorcYZ">
+  <meta charset="UTF-8" data-page-node-id="3inD7sHkpsMmzITBXVrURj">
+  <title>Browser Bridge</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --agent-primary: #1D9E75;
+      --agent-grad: linear-gradient(135deg, #1D9E75 0%, #5DCAA5 50%, #A0E8C5 100%);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 340px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      user-select: none;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--agent-grad);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 14px rgba(29, 158, 117, 0.4);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .logo svg { width: 16px; height: 16px; fill: #fff; }
+
+    .title-box h1 { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+    .title-box p { font-size: 11px; color: var(--text-muted); }
+
+    /* Agent Selector */
+    .agent-selector {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .agent-tab {
+      flex: 1;
+      padding: 8px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .agent-tab:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .agent-tab.active {
+      border-color: var(--agent-primary);
+      background: rgba(29, 158, 117, 0.12);
+    }
+
+    .agent-tab-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+    }
+
+    .agent-tab-name {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .agent-tab-status {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-top: 1px;
+    }
+
+    .status-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .status-label { font-size: 11px; color: var(--text-muted); }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-badge.offline {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .tab-info {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .tab-title {
+      font-size: 11.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+
+    .tab-url {
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: var(--agent-grad);
+      border: none;
+      color: #0b0f19;
+      box-shadow: 0 4px 12px rgba(29, 158, 117, 0.3);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.92;
+      box-shadow: 0 6px 16px rgba(29, 158, 117, 0.45);
+    }
+
+    .btn-rec {
+      border-color: rgba(239, 68, 68, 0.4);
+      background: rgba(239, 68, 68, 0.12);
+      color: #fca5a5;
+    }
+    .btn-rec.recording {
+      background: rgba(239, 68, 68, 0.35);
+      border-color: #ef4444;
+      color: #ffffff;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .guide-card {
+      margin-top: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .guide-card h3 {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .guide-card p {
+      font-size: 11px;
+      color: var(--text);
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .guide-examples {
+      list-style: none;
+      padding: 0;
+    }
+
+    .guide-examples li {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      padding: 3px 0;
+      padding-left: 12px;
+      position: relative;
+      line-height: 1.4;
+    }
+
+    .guide-examples li::before {
+      content: ">";
+      position: absolute;
+      left: 0;
+      color: var(--agent-primary);
+      font-weight: 700;
+    }
+
+    .footer {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 10px;
+      color: #64748b;
+      letter-spacing: 0.02em;
+    }
+
+    /* Offline helper banner */
+    .offline-help {
+      display: none;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    .offline-help.visible { display: block; }
+
+    .offline-help h3 {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--warning);
+      margin-bottom: 5px;
+    }
+
+    .offline-help p {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 7px;
+    }
+
+    .cmd-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 8px;
+    }
+
+    .cmd-text {
+      flex: 1;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 10.5px;
+      color: #a5f3d0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      user-select: all;
+    }
+
+    .cmd-copy {
+      flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .cmd-copy:hover { background: rgba(255, 255, 255, 0.18); }
+    .cmd-copy.copied { background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.5); color: #6ee7b7; }
+  </style>
+</head>
+<body data-page-node-id="W5apJFnRnUGlXsCtV1wfQy">
+  <div class="header" data-page-node-id="DLy6wck7Fxo5R28ECqnnxh">
+    <div class="logo" id="logo" data-page-node-id="wWu3KFqKKX0xNdiYYrBGV0">
+      <svg viewBox="0 0 24 24" data-page-node-id="oc0gua7YFxb71FHZdxTH6N"><path d="M12 2L2 19h20L12 2zm0 4l6.5 11h-13L12 6z" data-page-node-id="GaILn5Xjq1IklAnV4IJaVo"/></svg>
+    </div>
+    <div class="title-box" data-page-node-id="nDEqVQMoKSIYP8W7gBZUt9">
+      <h1 id="ext-title" data-page-node-id="gHqHB6hMwGpD6omGHyi2cl">Browser Bridge</h1>
+      <p id="ext-subtitle" data-page-node-id="4iuYioE8nn3F3onNrvG39y">Visual CDP & Multi-Agent Engine</p>
+    </div>
+  </div>
+
+  <!-- Agent Selector -->
+  <div class="agent-selector" id="agent-selector" data-page-node-id="0MabUhjYIKQxl6Az5zxpOB">
+    <!-- Populated by popup.js -->
+  </div>
+
+  <div class="status-card" data-page-node-id="jZbGfMZpgGIBXHehpVdpRb">
+    <div class="status-row" data-page-node-id="OEhMv31Pz47PhedIMQgTTr">
+      <span class="status-label" id="bridge-label" data-page-node-id="DcYRtTqzYRpw2Hq2mUjlZq">Bridge (Port 8766)</span>
+      <span class="status-badge" id="bridge-status" data-page-node-id="YtgVgFuWEv5Lc1qXx1ZHKr">
+        <span class="status-dot" data-page-node-id="0gfklwyfiz1qs80oYYcLAc"></span>
+        <span id="bridge-status-text" data-page-node-id="cCEwtdlP9cP5yytPXqBzyc">Checking...</span>
+      </span>
+    </div>
+    <div class="tab-info" data-page-node-id="0ytOYgy30x1b1Z3muuRbiG">
+      <div class="tab-title" id="active-tab-title" data-page-node-id="1b2WGXoaKKcGzVldVG0Akk">Loading tab info...</div>
+      <div class="tab-url" id="active-tab-url" data-page-node-id="g129QwRPX55joVrHYAQ5Mk">...</div>
+    </div>
+  </div>
+
+  <!-- Shown only when the bridge server is not running -->
+  <div class="offline-help" id="offline-help" data-page-node-id="NkabNopnNkVq5wHS98wBWg">
+    <h3 data-page-node-id="X5j6bXUzfQjMQABfr2OhrX">Waiting for the bridge</h3>
+    <p data-page-node-id="9qeS8R9QgANqYqNqZ5a9qD">WorkBuddy starts the bridge automatically. If you're driving this from another agent, start it manually:</p>
+    <div class="cmd-row" data-page-node-id="Lpei2TWdmmJ6Ar3K4XxEnM">
+      <span class="cmd-text" id="cmd-text" data-page-node-id="p7SJhCV1ksZCup6YIQo0hP">cd workbuddy-browser-bridge &amp;&amp; ./start-bridge.sh</span>
+      <button class="cmd-copy" id="cmd-copy" data-page-node-id="X5DJUlmGz6CKCCaUa6SbBV">Copy</button>
+    </div>
+  </div>
+
+  <div class="actions" data-page-node-id="87LqrsYlnit0HUkxwONXDO">
+    <button class="btn btn-primary" id="btn-test-cursor" data-page-node-id="0QJUg5MN4jdroFlo8vVNmt">
+      Test Visual Laser Cursor
+    </button>
+    <button class="btn" id="btn-tag-som" data-page-node-id="T7u15Bjn0M6vTGMyYztu8D">
+      Tag Elements (Set-of-Mark)
+    </button>
+    <button class="btn" id="btn-toggle-omnibar" data-page-node-id="JJXjPowr2YLaJGSCL81h4T">
+      Open In-Page Omnibar (Cmd+Shift+K)
+    </button>
+    <button class="btn btn-rec" id="btn-record-macro" data-page-node-id="M2DUVy2V3bmm9JfjRsHxk2">
+      Start Macro Recorder
+    </button>
+  </div>
+
+  <!-- Agent Guide Card -->
+  <div class="guide-card" id="guide-card" data-page-node-id="A5G3CVWHJ6wUXijlJRL49c">
+    <h3 id="guide-title" data-page-node-id="cGuIZZsfZ2R2FTP268EOh4">Quick guide</h3>
+    <p id="guide-quickstart" data-page-node-id="6CQCViAAxiWXRsNrnpqhJU"></p>
+    <ul class="guide-examples" id="guide-examples" data-page-node-id="iHzUTJNGCvYqmp5txMihxT">
+      <!-- Populated by popup.js -->
+    </ul>
+  </div>
+
+  <div class="footer" data-page-node-id="alpcZZbQcjz1ZSQRDsEc5R">
+    Browser Bridge v2.0 · Multi-Agent AI Browser Engine
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

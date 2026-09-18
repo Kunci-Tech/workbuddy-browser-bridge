@@ -1,0 +1,279 @@
+/* Browser Bridge Visual Laser Cursor & Overlay */
+#bridge-cursor-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none !important;
+  z-index: 2147483647 !important;
+  overflow: hidden;
+  display: block;
+}
+
+#bridge-laser-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  pointer-events: none !important;
+  transform: translate3d(-100px, -100px, 0);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  opacity: 0;
+  filter: drop-shadow(0 2px 8px rgba(29, 158, 117, 0.6));
+}
+
+#bridge-laser-cursor.active {
+  opacity: 1;
+}
+
+#bridge-laser-cursor svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Action Badge */
+#bridge-action-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none !important;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #f8fafc;
+  border: 1px solid rgba(29, 158, 117, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 12px rgba(29, 158, 117, 0.3);
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate3d(-100px, -100px, 0) scale(0.92);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#bridge-action-badge.active {
+  opacity: 1;
+}
+
+#bridge-action-badge::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #1D9E75;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #1D9E75;
+  animation: bridge-pulse 1.4s infinite ease-in-out;
+}
+
+/* Amber Human Handshake Alert State */
+#bridge-action-badge.handshake {
+  border-color: rgba(245, 158, 11, 0.8) !important;
+  background: rgba(40, 25, 5, 0.95) !important;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5) !important;
+  color: #fbbf24 !important;
+}
+#bridge-action-badge.handshake::before {
+  background: #f59e0b !important;
+  box-shadow: 0 0 8px #f59e0b !important;
+}
+
+/* Pulsing Red Guardrail Alert State */
+#bridge-action-badge.guardrail {
+  border-color: rgba(239, 68, 68, 0.8) !important;
+  background: rgba(45, 10, 10, 0.96) !important;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6) !important;
+  color: #f87171 !important;
+  animation: bridge-shake 0.4s ease-in-out;
+}
+#bridge-action-badge.guardrail::before {
+  background: #ef4444 !important;
+  box-shadow: 0 0 10px #ef4444 !important;
+}
+
+/* Click Ripple Wave */
+.bridge-ripple {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #1D9E75;
+  background: rgba(29, 158, 117, 0.25);
+  box-shadow: 0 0 12px rgba(29, 158, 117, 0.7);
+  pointer-events: none !important;
+  transform: translate(-50%, -50%) scale(0.2);
+  animation: bridge-ripple-anim 0.6s cubic-bezier(0, 0.2, 0.8, 1) forwards;
+}
+
+/* Set-of-Mark (SoM) Tagging Badges */
+#bridge-som-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none !important;
+  z-index: 2147483640 !important;
+  overflow: hidden;
+}
+
+.bridge-som-badge {
+  position: absolute;
+  pointer-events: none !important;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  z-index: 2147483641;
+  letter-spacing: -0.02em;
+}
+
+/* In-Page Floating AI Omnibar (HUD) */
+#bridge-omnibar-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2147483645 !important;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+#bridge-omnibar-wrapper.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#bridge-omnibar {
+  width: 90%;
+  max-width: 640px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(29, 158, 117, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), 0 0 24px rgba(29, 158, 117, 0.25);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transform: scale(0.96) translateY(-8px);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#bridge-omnibar-wrapper.visible #bridge-omnibar {
+  transform: scale(1) translateY(0);
+}
+
+.bridge-omnibar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bridge-omnibar-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.bridge-omnibar-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.bridge-omnibar-input::placeholder {
+  color: #94a3b8;
+}
+
+.bridge-omnibar-kbd {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-family: monospace;
+}
+
+.bridge-omnibar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 18px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.bridge-chip-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.bridge-chip-btn:hover {
+  background: rgba(29, 158, 117, 0.2);
+  border-color: rgba(29, 158, 117, 0.5);
+  color: #ffffff;
+}
+
+.bridge-omnibar-footer {
+  padding: 10px 18px;
+  font-size: 11.5px;
+  color: #64748b;
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+@keyframes bridge-ripple-anim {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(0.3); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(3.5); }
+}
+
+@keyframes bridge-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.4); opacity: 1; }
+}
+
+@keyframes bridge-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20%, 60% { transform: translate3d(-4px, 0, 0); }
+  40%, 80% { transform: translate3d(4px, 0, 0); }
+}
