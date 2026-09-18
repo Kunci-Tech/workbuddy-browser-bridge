@@ -13,7 +13,7 @@
 
 ## Quick install
 
-Three commands, then two manual steps.
+Three commands, then three manual steps.
 
 ```bash
 git clone https://github.com/Kunci-Tech/workbuddy-browser-bridge.git
@@ -23,12 +23,15 @@ npm run install-mcp && npm run doctor
 
 `install-mcp` registers the bridge with WorkBuddy — safe to re-run, and other MCP servers in your config are left untouched. `doctor` verifies the whole chain and tells you exactly what's missing.
 
-Then the two things only you can do:
+Then the three things only you can do:
 
-1. **Trust the server** — WorkBuddy → connector management → custom connectors (top-right) → **Trust** on `browser-bridge`.
-2. **Load the extension** — `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the `workbuddy-browser-bridge` folder.
+1. **Restart WorkBuddy.** WorkBuddy reads its MCP config at startup, so a server registered while the app is already running does not appear under custom connectors at all — there is nothing to Trust yet. Fully quit and relaunch. If `doctor` prints a `WorkBuddy session` warning, this is why.
+2. **Trust the server** — WorkBuddy → connector management → custom connectors (top-right) → **Trust** on `browser-bridge`.
+3. **Load the extension** — `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the folder you cloned into (the one containing `manifest.json`). `doctor` prints the exact path to use, so copy it from there rather than guessing.
 
 Re-run `npm run doctor` and the extension should report as connected. The badge turns green **WOR**.
+
+> **Chrome profiles matter.** An unpacked extension is only active in the profile that has it loaded. If you browse in a profile you did not load it into, the bridge never sees it. `doctor` reports which profile holds the extension — browse there, or load it into the profile you actually use.
 
 Prefer to have your agent do the whole thing? → **[Install with AI](#install-with-ai)**. Full step-by-step walkthrough → **[Quickstart](#quickstart--install-once-no-terminal)**.
 
@@ -36,7 +39,7 @@ Prefer to have your agent do the whole thing? → **[Install with AI](#install-w
 
 ## Install with AI
 
-Paste this into WorkBuddy (or any agent with shell access). It runs the setup, verifies it, and hands back only the two steps that need a human:
+Paste this into WorkBuddy (or any agent with shell access). It runs the setup, verifies it, and hands back only the steps that need a human:
 
 ```text
 Set up Browser Bridge so you can control my Chrome browser directly.
@@ -51,14 +54,26 @@ If it is already cloned somewhere on this machine, use that copy instead of clon
    other MCP servers untouched. Safe to re-run.
 4. Verify: npm run doctor
    Report the full output. Fix anything marked FAIL before continuing.
-   The "Live bridge" and "Chrome extension" warnings are expected right now — they are
-   the two manual steps below.
-5. Tell me the two things only I can do, and wait for my confirmation:
-   a) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
+   Then read the warnings properly instead of assuming they are all the expected
+   "not connected yet" ones. doctor separates "the install is broken" from "the human
+   has not finished yet", and names the specific blocker:
+     - "WorkBuddy session" -> the app started before the config was written. It reads
+       mcp.json only at startup, so the server is not listed and cannot be trusted
+       until it is restarted. Tell me to restart, and do not try to work around it.
+     - "Chrome extension" -> tells you which Chrome profile has the extension loaded,
+       or that it is missing, disabled, or that a different bridge extension is loaded.
+       Quote the exact path it prints for the Load unpacked step.
+     - "Live bridge" -> expected until the server is trusted; it goes away on its own.
+5. Tell me the things only I can do, and wait for my confirmation:
+   a) Fully quit and relaunch WorkBuddy, if doctor warned about the session.
+   b) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
       click Trust on "browser-bridge".
-   b) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
-      select the workbuddy-browser-bridge folder.
-6. After I confirm both, run npm run doctor again. The extension should show as connected.
+   c) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
+      select the folder doctor printed (the one with manifest.json). It must be loaded
+      in the Chrome profile I actually browse in, because an unpacked extension is only
+      active in the profile that has it.
+6. After I confirm, run npm run doctor again, then call browser_status. It should report
+   connected: true.
 
 Notes:
 - Do not start a long-running server yourself. Once the MCP server is trusted, WorkBuddy
@@ -563,28 +578,36 @@ npm run install-mcp
 
 This writes one entry into `~/.workbuddy-ai/mcp.json`, preserving any servers already there. Use `BRIDGE_NODE=/path/to/node` if you want to pin a specific Node binary.
 
-### Step 2: Trust it in WorkBuddy
+### Step 2: Restart WorkBuddy
+
+WorkBuddy reads `mcp.json` once, at startup. If it was already running when you ran `install-mcp`, the `browser-bridge` server is not in its list yet — it will not appear under custom connectors, so there is nothing to trust. Fully quit and relaunch.
+
+`npm run doctor` flags this as a `WorkBuddy session` warning, so you don't have to work it out from scratch.
+
+### Step 3: Trust it in WorkBuddy
 
 Open WorkBuddy → connector management → the custom connectors entry at the top-right → click **Trust** on `browser-bridge`.
 
 From then on WorkBuddy spawns the bridge whenever it needs it.
 
-### Step 3: Load the extension into Chrome
+### Step 4: Load the extension into Chrome
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked**
-4. Select the `workbuddy-browser-bridge` folder
+4. Select the folder you cloned into — the one containing `manifest.json` (`npm run doctor` prints the exact path)
+
+Load it in the profile you actually browse in. An unpacked extension is only active in the profile that has it loaded, and `doctor` reports which profile it found it in.
 
 The badge turns green **WOR** as soon as WorkBuddy's bridge is up.
 
-### Step 4: Just ask
+### Step 5: Just ask
 
 > "Open my Google Ads campaigns tab and screenshot the table."
 
 WorkBuddy calls the browser tools directly — 11 of them, listed below.
 
-### Step 5: Verify (anytime)
+### Step 6: Verify (anytime)
 
 ```bash
 npm run doctor
