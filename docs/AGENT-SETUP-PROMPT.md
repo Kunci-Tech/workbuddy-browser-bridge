@@ -23,21 +23,34 @@ If it is already cloned somewhere on this machine, use that copy instead of clon
    other MCP servers untouched. Safe to re-run.
 4. Verify: npm run doctor
    Report the full output. Fix anything marked FAIL before continuing.
-   The "Live bridge" and "Chrome extension" warnings are expected right now — they are
-   the two manual steps below.
-5. Tell me the two things only I can do, and wait for my confirmation:
+   Then read the warnings properly instead of assuming they are all the expected
+   "not connected yet" ones. doctor separates "the install is broken" from "the human
+   has not finished yet", and names the specific blocker:
+     - "MCP trust" -> the server has not been approved yet, so WorkBuddy is not exposing
+       it. This is the usual blocker, and it is not a broken install.
+     - "Chrome extension" -> tells you which Chrome profile has the extension loaded,
+       or that it is missing, disabled, or that a different bridge extension is loaded.
+       Quote the exact path it prints for the Load unpacked step.
+     - "Live bridge" -> expected until the server is trusted; it goes away on its own.
+5. Tell me the things only I can do, and wait for my confirmation:
    a) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
-      click Trust on "browser-bridge".
+      click Trust on "browser-bridge". This is the gate; nothing is exposed until then.
    b) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
-      select the workbuddy-browser-bridge folder.
-6. After I confirm both, run npm run doctor again. The extension should show as connected.
+      select the folder doctor printed (the one with manifest.json). It must be loaded
+      in the Chrome profile I actually browse in, because an unpacked extension is only
+      active in the profile that has it.
+6. After I confirm, tell me to start a NEW conversation and call browser_status there.
+   A conversation that was already open does not pick up a newly granted approval. It
+   should report connected: true. If it still does not, do not reinstall anything: the
+   bridge also speaks plain HTTP on port 8766, and docs/TROUBLESHOOTING.md explains how
+   to drive Chrome that way instead.
 
 Notes:
 - Do not start a long-running server yourself. Once the MCP server is trusted, WorkBuddy
   spawns and manages the bridge automatically.
 - The browser tools (browser_navigate, browser_click, browser_screenshot, ...) only become
-  visible after the server is trusted AND the session reloads. If you cannot see them yet,
-  say so instead of assuming the install failed.
+  visible after the server is trusted AND you start a NEW conversation. If you cannot see
+  them yet, say so instead of assuming the install failed.
 - To debug the bridge, run `node mcp/server.js` in the background and read stderr. It must
   never write to stdout, because stdout carries the MCP protocol stream.
 ```
@@ -48,12 +61,17 @@ Notes:
 
 ### It separates what the agent can do from what only the human can do
 
-Two steps in this install are physically impossible for an agent:
+Three steps in this install are impossible for an agent:
 
-- **Trusting the MCP server** happens in WorkBuddy's own UI. No file write can pre-authorize it.
+- **Trusting the MCP server** happens in WorkBuddy's own UI. No file write can pre-authorize it, and nothing is exposed until it happens.
 - **Loading the extension** happens in `chrome://extensions`, a page extensions cannot script.
+- **Starting a new conversation** is a UI action, and it is the step that actually delivers the tools — see below.
 
-An agent that doesn't know this will burn turns trying to automate them, or worse, will assume the whole install failed. The prompt names both steps explicitly and tells the agent to **stop and wait** at step 5.
+An agent that doesn't know this will burn turns trying to automate them, or worse, will assume the whole install failed. The prompt names all three explicitly and tells the agent to **stop and wait** at step 5.
+
+The third one is the least obvious. WorkBuddy resolves MCP servers per conversation, so a config entry is picked up without restarting the app — but the *approval* is not retroactive. A conversation already open when you click Trust will never see the tools, however long you wait and however many times you re-run `doctor`. "It still doesn't work" very often just means "open a new chat".
+
+Note what is **not** on this list: restarting WorkBuddy. It is the natural thing to try and it does no harm, but it is not what gates the server — trust is. `doctor` reports the approval directly as `MCP trust` rather than inferring anything from timing, so there is no guesswork involved.
 
 ### `npm run doctor` gives the agent a verdict, not a log dump
 
@@ -65,8 +83,14 @@ Without it, an agent running `curl http://127.0.0.1:8766/status` sees `connectio
 | :--- | :--- |
 | `connection refused` | Nothing is wrong — WorkBuddy hasn't been asked to spawn the bridge yet |
 | `connection refused` | The MCP registration is genuinely broken |
+| extension `not connected` | The extension was never loaded |
+| extension `not connected` | It is loaded, but into a different Chrome profile |
+| extension `not connected` | It is loaded but disabled |
+| extension `not connected` | A different, look-alike extension is the one loaded |
 
-Both produce identical output. An agent that guesses wrong starts reinstalling things that were already working, and the session spirals.
+Every row within a group produces identical output. An agent that guesses wrong starts reinstalling things that were already working, and the session spirals.
+
+`doctor` answers the Chrome half of that table directly, by reading Chrome's own profile preferences: it names the profile holding the extension, whether it is enabled, and whether a sibling project's extension is the one loaded instead.
 
 `doctor` collapses that ambiguity into three levels:
 
@@ -84,7 +108,7 @@ The prompt forbids it and explains why.
 
 ### It warns about the tool-visibility lag
 
-MCP tools only appear after the server is trusted **and** the session reloads. An agent that can't see `browser_navigate` yet might reasonably conclude the install failed. The prompt tells it to report the situation rather than guess.
+MCP tools only appear after the server is trusted **and** you start a new conversation. An agent that can't see `browser_navigate` yet might reasonably conclude the install failed. The prompt tells it to report the situation rather than guess.
 
 ### It protects stdout
 

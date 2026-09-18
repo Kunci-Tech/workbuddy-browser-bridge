@@ -506,14 +506,36 @@ async function main() {
   }
 
   if (warned > 0) {
-    console.log(yellow("  Nothing broken.") + " The remaining warnings are steps only a human can do:");
-    console.log("    1. Trust the MCP server: connector management -> custom connectors -> Trust on browser-bridge.");
-    console.log("    2. Load the extension at chrome://extensions -> Load unpacked, using the path printed above.");
-    console.log("");
-    console.log(dim("  Then start a NEW conversation — a running one does not pick up a newly granted approval."));
+    // Only surface the human steps that are actually outstanding. Printing them
+    // unconditionally made a fully working install look unfinished.
+    const warnedNames = new Set(results.filter((r) => r.level === "warn").map((r) => r.name));
+    const humanSteps = [];
+
+    if (warnedNames.has("MCP trust")) {
+      humanSteps.push(
+        "Trust the MCP server: connector management -> custom connectors -> Trust on browser-bridge."
+      );
+    }
+    if (warnedNames.has("Chrome extension")) {
+      humanSteps.push(
+        "Load the extension at chrome://extensions -> Load unpacked, using the path printed above."
+      );
+    }
+
+    if (humanSteps.length) {
+      console.log(yellow("  Nothing broken.") + " The remaining warnings are steps only a human can do:");
+      humanSteps.forEach((step, i) => console.log(`    ${i + 1}. ${step}`));
+      console.log("");
+      console.log(dim("  Then start a NEW conversation — a running one does not pick up a newly granted approval."));
+    } else {
+      console.log(
+        yellow("  Nothing broken.") + " Every agent-side check passed — the warnings above are informational."
+      );
+    }
     console.log(dim("  Blocked anyway? The bridge also speaks plain HTTP on port 8766 — see docs/TROUBLESHOOTING.md."));
   } else {
     console.log(green("  All good. Ask your agent to browse."));
+    console.log(dim("  Tools missing in this conversation? Approvals are not retroactive — start a new one."));
   }
   console.log("");
 

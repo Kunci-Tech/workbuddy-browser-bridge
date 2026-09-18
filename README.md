@@ -13,7 +13,7 @@
 
 ## Quick install
 
-Three commands, then two manual steps.
+Three commands, then three manual steps.
 
 ```bash
 git clone https://github.com/Kunci-Tech/workbuddy-browser-bridge.git
@@ -23,12 +23,17 @@ npm run install-mcp && npm run doctor
 
 `install-mcp` registers the bridge with WorkBuddy — safe to re-run, and other MCP servers in your config are left untouched. `doctor` verifies the whole chain and tells you exactly what's missing.
 
-Then the two things only you can do:
+Then the three things only you can do:
 
-1. **Trust the server** — WorkBuddy → connector management → custom connectors (top-right) → **Trust** on `browser-bridge`.
-2. **Load the extension** — `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the `workbuddy-browser-bridge` folder.
+1. **Trust the server** — WorkBuddy → connector management → custom connectors (top-right) → **Trust** on `browser-bridge`. Nothing is exposed until you do, and `doctor` reports `MCP trust` so you can confirm it landed.
+2. **Load the extension** — `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the folder you cloned into (the one containing `manifest.json`). `doctor` prints the exact path to use, so copy it from there rather than guessing.
+3. **Start a new conversation.** The browser tools are injected per conversation, so one that was already open will not pick up a newly granted approval. This is the step people miss.
 
-Re-run `npm run doctor` and the extension should report as connected. The badge turns green **WOR**.
+Then just ask — *"open google.com"*. `doctor` should report every line as `PASS`, and the badge turns green **WOR** once WorkBuddy spawns the bridge on first use.
+
+> **Chrome profiles matter.** An unpacked extension is only active in the profile that has it loaded. If you browse in a profile you did not load it into, the bridge never sees it. `doctor` reports which profile holds the extension — browse there, or load it into the profile you actually use.
+
+> **A grey `OFF` badge is not an error.** It means the extension is loaded and the bridge is not running *yet*, which is the normal state until WorkBuddy spawns it. See [Troubleshooting](docs/TROUBLESHOOTING.md).
 
 Prefer to have your agent do the whole thing? → **[Install with AI](#install-with-ai)**. Full step-by-step walkthrough → **[Quickstart](#quickstart--install-once-no-terminal)**.
 
@@ -36,7 +41,7 @@ Prefer to have your agent do the whole thing? → **[Install with AI](#install-w
 
 ## Install with AI
 
-Paste this into WorkBuddy (or any agent with shell access). It runs the setup, verifies it, and hands back only the two steps that need a human:
+Paste this into WorkBuddy (or any agent with shell access). It runs the setup, verifies it, and hands back only the steps that need a human:
 
 ```text
 Set up Browser Bridge so you can control my Chrome browser directly.
@@ -51,21 +56,35 @@ If it is already cloned somewhere on this machine, use that copy instead of clon
    other MCP servers untouched. Safe to re-run.
 4. Verify: npm run doctor
    Report the full output. Fix anything marked FAIL before continuing.
-   The "Live bridge" and "Chrome extension" warnings are expected right now — they are
-   the two manual steps below.
-5. Tell me the two things only I can do, and wait for my confirmation:
+   Then read the warnings properly instead of assuming they are all the expected
+   "not connected yet" ones. doctor separates "the install is broken" from "the human
+   has not finished yet", and names the specific blocker:
+     - "MCP trust" -> the server has not been approved yet, so WorkBuddy is not exposing
+       it. This is the usual blocker, and it is not a broken install.
+     - "Chrome extension" -> tells you which Chrome profile has the extension loaded,
+       or that it is missing, disabled, or that a different bridge extension is loaded.
+       Quote the exact path it prints for the Load unpacked step.
+     - "Live bridge" -> expected until the server is trusted; it goes away on its own.
+5. Tell me the things only I can do, and wait for my confirmation:
    a) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
-      click Trust on "browser-bridge".
+      click Trust on "browser-bridge". This is the gate; nothing is exposed until then.
    b) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
-      select the workbuddy-browser-bridge folder.
-6. After I confirm both, run npm run doctor again. The extension should show as connected.
+      select the folder doctor printed (the one with manifest.json). It must be loaded
+      in the Chrome profile I actually browse in, because an unpacked extension is only
+      active in the profile that has it.
+6. After I confirm, tell me to start a NEW conversation and call browser_status there.
+   A conversation that was already open does not pick up a newly granted approval. It
+   should report connected: true. If it still does not, do not reinstall anything: the
+   bridge also speaks plain HTTP on port 8766, and docs/TROUBLESHOOTING.md explains how
+   to drive Chrome that way instead.
+   connected: true.
 
 Notes:
 - Do not start a long-running server yourself. Once the MCP server is trusted, WorkBuddy
   spawns and manages the bridge automatically.
 - The browser tools (browser_navigate, browser_click, browser_screenshot, ...) only become
-  visible after the server is trusted AND the session reloads. If you cannot see them yet,
-  say so instead of assuming the install failed.
+  visible after the server is trusted AND you start a NEW conversation. If you cannot see
+  them yet, say so instead of assuming the install failed.
 - To debug the bridge, run `node mcp/server.js` in the background and read stderr. It must
   never write to stdout, because stdout carries the MCP protocol stream.
 ```
@@ -87,6 +106,9 @@ Those two states look identical to an agent reading raw output, and conflating t
 - [Quick install](#quick-install)
 - [Install with AI](#install-with-ai)
 - [Why Browser Bridge?](#why-browser-bridge)
+  - [What makes this hackathon-worthy](#what-makes-this-hackathon-worthy)
+  - [Bundled Chromium vs. your own Chrome](#bundled-chromium-vs-your-own-chrome)
+  - [Why bundled browsers get blocked at sign-in](#why-bundled-browsers-get-blocked-at-sign-in)
 - [How It Works — The Architecture](#how-it-works--the-architecture)
   - [The Big Picture](#the-big-picture)
   - [Layer 1: The Chrome Extension](#layer-1-the-chrome-extension)
@@ -129,6 +151,57 @@ Every AI agent that needs browser access faces the same tradeoff: pay $200/month
 | **Safety guardrails** | Hover & confirm red alert | No | No | No |
 | **Dependencies** | Zero npm packages | — | — | Dozens |
 | **Cost** | Free & unlimited (MIT) | $20/month | $200/month | Free tool |
+
+### Bundled Chromium vs. your own Chrome
+
+Most local agents ship a browser of their own — a bundled Chromium that the agent
+downloads, launches and drives. That is a perfectly reasonable tool for public pages.
+It falls apart the moment a sign-in is involved.
+
+| | Bundled Chromium (e.g. `agent-browser`) | Browser Bridge |
+| :--- | :--- | :--- |
+| **Which browser** | Its own download (~500 MB), separate profile | The Chrome you already run |
+| **Session state** | None — fresh profile, no cookies | Your cookies, tabs and logins |
+| **Signing in** | Log in from scratch, every session | Already signed in — no login step exists |
+| **OAuth / Google sign-in** | Frequently blocked outright | Never triggered — the session already exists |
+| **CAPTCHA / 2FA** | Dead end | Pauses for a human handshake, then resumes |
+| **What you see** | A screenshot, afterwards | The cursor moving, live in your own window |
+| **Setup** | Zero | Trust + load extension, once |
+| **Blast radius** | Sandboxed — cannot touch your accounts | Your real accounts and real data |
+
+#### Why bundled browsers get blocked at sign-in
+
+A freshly launched Chromium is a browser Google has never seen. It has no history, no
+cookies, and — under most automation frameworks — it announces itself with
+`--enable-automation` and a CDP-driven fingerprint. Google's risk engine reads that
+combination as a new, unattended device and may respond by:
+
+- refusing the sign-in with **"This browser or app may not be secure"**;
+- blocking the **OAuth consent screen** for automated user agents;
+- demanding an **extra verification round** on an account that has been signed in for
+  months on your real browser;
+- failing **passkey / WebAuthn** prompts, which need a platform authenticator a bundled
+  browser does not have.
+
+You can fight this with stealth patches, spoofed user agents and a persisted profile
+directory. It is a permanent maintenance burden, it may breach the terms of service of
+the site you are automating, and it still leaves you typing real credentials into a
+script.
+
+**Browser Bridge avoids the problem entirely: it never logs in.** It attaches to a Chrome
+session that is already authenticated, so no sign-in flow runs, no consent screen is
+reached, and no credential is ever handed to a script. The OAuth tokens you already hold
+are simply *used* — through the browser that legitimately holds them.
+
+#### Rule of thumb
+
+- **Behind a login → use the bridge.** Dashboards, ad platforms, admin panels, analytics,
+  anything with an OAuth flow, 2FA or a passkey.
+- **Public page → either works.** For scraping and screenshots of anonymous content, a
+  bundled browser is lighter, needs no setup, and cannot touch your accounts.
+
+If you are signed in nowhere, the two are equivalent. The moment a session exists, only
+the bridge can use it.
 
 ---
 
@@ -567,6 +640,8 @@ This writes one entry into `~/.workbuddy-ai/mcp.json`, preserving any servers al
 
 Open WorkBuddy → connector management → the custom connectors entry at the top-right → click **Trust** on `browser-bridge`.
 
+**No restart needed.** WorkBuddy re-resolves `mcp.json` for every new conversation, so a freshly installed server shows up in the list right away. What is *not* retroactive is trust: the conversation you are sitting in will not gain the browser tools, but the next one will.
+
 From then on WorkBuddy spawns the bridge whenever it needs it.
 
 ### Step 3: Load the extension into Chrome
@@ -574,9 +649,15 @@ From then on WorkBuddy spawns the bridge whenever it needs it.
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked**
-4. Select the `workbuddy-browser-bridge` folder
+4. Select the folder you cloned into — the one containing `manifest.json` (`npm run doctor` prints the exact path)
 
-The badge turns green **WOR** as soon as WorkBuddy's bridge is up.
+Load it in the profile you actually browse in. An unpacked extension is only active in the profile that has it loaded, and `doctor` reports which profile it found it in.
+
+### Step 4: Start a new conversation
+
+The browser tools are injected when a conversation starts, so one that was already open when you clicked Trust will not have them. Start a fresh conversation.
+
+A grey **OFF** badge before your first request is normal — it means the extension is loaded and the bridge is not running yet. It turns green **WOR** as soon as WorkBuddy spawns the bridge.
 
 ### Step 4: Just ask
 
@@ -596,6 +677,8 @@ One command that checks the entire chain and reports a verdict:
   PASS  Node.js            v22.22.2
   PASS  Project files      8 core files present
   PASS  MCP registration   browser-bridge -> /path/to/mcp/server.js
+  WARN  MCP trust          no servers approved yet
+        -> Trust it in WorkBuddy: connector management -> custom connectors -> Trust on browser-bridge.
   PASS  Agent registry     2 agents, ports in sync with background.js
   PASS  MCP server         browser-bridge v2.0.0 — 11 tools, handshake OK
   WARN  Live bridge        nothing listening on port 8766
@@ -603,7 +686,7 @@ One command that checks the entire chain and reports a verdict:
   WARN  Chrome extension   not connected (no bridge to connect to)
         -> Load the extension: chrome://extensions -> Developer mode -> Load unpacked.
 
-  5 passed · 2 warnings · 0 failures
+  5 passed · 3 warnings · 0 failures
 ```
 
 A `WARN` is fine — it just means a manual step hasn't happened yet. A `FAIL` exits with code 1 and tells you the exact command to fix it. Run this first whenever something seems off.
