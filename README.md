@@ -102,7 +102,7 @@ Those two states look identical to an agent reading raw output, and conflating t
 - [Quick install](#quick-install)
 - [Install with AI](#install-with-ai)
 - [Why Browser Bridge?](#why-browser-bridge)
-  - [What makes this hackathon-worthy](#what-makes-this-hackathon-worthy)
+  - [How it compares](#how-it-compares)
   - [Bundled Chromium vs. your own Chrome](#bundled-chromium-vs-your-own-chrome)
   - [Why bundled browsers get blocked at sign-in](#why-bundled-browsers-get-blocked-at-sign-in)
 - [How It Works — The Architecture](#how-it-works--the-architecture)
@@ -131,7 +131,7 @@ Every AI agent that needs browser access faces the same tradeoff: pay $200/month
 
 **Browser Bridge solves this.** It connects any local AI agent directly to your active, logged-in Chrome profile via a zero-dependency local bridge server and native Chrome DevTools Protocol. The extension is **agent-agnostic** — switch between WorkBuddy, Antigravity, or any future agent with a click.
 
-### What makes this hackathon-worthy
+### How it compares
 
 | Feature | Browser Bridge | ChatGPT Browsing | OpenAI Operator | Puppeteer |
 | :--- | :--- | :--- | :--- | :--- |
@@ -551,7 +551,7 @@ Total round-trip: ~50-100ms for a click, ~200ms for tagging (depends on page com
 
 **Why not use the `ws` package?**
 
-1. **Zero dependencies** is a hackathon selling point. `npm install` should be optional, not required.
+1. **Zero dependencies** is a deliberate selling point. `npm install` should be optional, not required.
 2. The extension's WebSocket client is the browser's native `WebSocket` — the server side just needs to speak the same protocol.
 3. The implementation is ~200 lines. It's auditable in one read.
 
