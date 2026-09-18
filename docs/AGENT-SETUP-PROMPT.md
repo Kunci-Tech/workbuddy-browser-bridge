@@ -23,14 +23,26 @@ If it is already cloned somewhere on this machine, use that copy instead of clon
    other MCP servers untouched. Safe to re-run.
 4. Verify: npm run doctor
    Report the full output. Fix anything marked FAIL before continuing.
-   The "Live bridge" and "Chrome extension" warnings are expected right now — they are
-   the two manual steps below.
-5. Tell me the two things only I can do, and wait for my confirmation:
-   a) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
+   Then read the warnings properly instead of assuming they are all the expected
+   "not connected yet" ones. doctor separates "the install is broken" from "the human
+   has not finished yet", and names the specific blocker:
+     - "WorkBuddy session" -> the app started before the config was written. It reads
+       mcp.json only at startup, so the server is not listed and cannot be trusted
+       until it is restarted. Tell me to restart, and do not try to work around it.
+     - "Chrome extension" -> tells you which Chrome profile has the extension loaded,
+       or that it is missing, disabled, or that a different bridge extension is loaded.
+       Quote the exact path it prints for the Load unpacked step.
+     - "Live bridge" -> expected until the server is trusted; it goes away on its own.
+5. Tell me the things only I can do, and wait for my confirmation:
+   a) Fully quit and relaunch WorkBuddy, if doctor warned about the session.
+   b) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
       click Trust on "browser-bridge".
-   b) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
-      select the workbuddy-browser-bridge folder.
-6. After I confirm both, run npm run doctor again. The extension should show as connected.
+   c) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
+      select the folder doctor printed (the one with manifest.json). It must be loaded
+      in the Chrome profile I actually browse in, because an unpacked extension is only
+      active in the profile that has it.
+6. After I confirm, run npm run doctor again, then call browser_status. It should report
+   connected: true.
 
 Notes:
 - Do not start a long-running server yourself. Once the MCP server is trusted, WorkBuddy
@@ -48,12 +60,15 @@ Notes:
 
 ### It separates what the agent can do from what only the human can do
 
-Two steps in this install are physically impossible for an agent:
+Three steps in this install are impossible for an agent:
 
+- **Restarting WorkBuddy** is a lifecycle action on the very app hosting the agent.
 - **Trusting the MCP server** happens in WorkBuddy's own UI. No file write can pre-authorize it.
 - **Loading the extension** happens in `chrome://extensions`, a page extensions cannot script.
 
-An agent that doesn't know this will burn turns trying to automate them, or worse, will assume the whole install failed. The prompt names both steps explicitly and tells the agent to **stop and wait** at step 5.
+An agent that doesn't know this will burn turns trying to automate them, or worse, will assume the whole install failed. The prompt names all three explicitly and tells the agent to **stop and wait** at step 5.
+
+The restart is the least obvious and the easiest to miss. WorkBuddy reads `~/.workbuddy-ai/mcp.json` once, at startup. Register the bridge while the app is already running and the server is not in the in-memory list at all — it never shows up under custom connectors, so there is nothing to click Trust on, and starting a new chat does not help. `doctor` detects this by comparing the app's last start time against the config's mtime and reports it as a `WorkBuddy session` warning.
 
 ### `npm run doctor` gives the agent a verdict, not a log dump
 
@@ -65,8 +80,14 @@ Without it, an agent running `curl http://127.0.0.1:8766/status` sees `connectio
 | :--- | :--- |
 | `connection refused` | Nothing is wrong — WorkBuddy hasn't been asked to spawn the bridge yet |
 | `connection refused` | The MCP registration is genuinely broken |
+| extension `not connected` | The extension was never loaded |
+| extension `not connected` | It is loaded, but into a different Chrome profile |
+| extension `not connected` | It is loaded but disabled |
+| extension `not connected` | A different, look-alike extension is the one loaded |
 
-Both produce identical output. An agent that guesses wrong starts reinstalling things that were already working, and the session spirals.
+Every row within a group produces identical output. An agent that guesses wrong starts reinstalling things that were already working, and the session spirals.
+
+`doctor` answers the Chrome half of that table directly, by reading Chrome's own profile preferences: it names the profile holding the extension, whether it is enabled, and whether a sibling project's extension is the one loaded instead.
 
 `doctor` collapses that ambiguity into three levels:
 

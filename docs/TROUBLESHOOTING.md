@@ -6,10 +6,10 @@
 npm run doctor
 ```
 
-One command that checks the whole chain — Node version, project files, MCP registration, a live MCP handshake, and whether Chrome has connected — then prints a verdict:
+One command that checks the whole chain — Node version, project files, MCP registration, whether WorkBuddy has been restarted since the config was written, a live MCP handshake, and whether Chrome actually has the extension loaded and enabled — then prints a verdict:
 
 - **PASS** — verified working
-- **WARN** — fine, but a manual step hasn't happened yet (trusting the server, loading the extension)
+- **WARN** — fine, but a manual step hasn't happened yet (restarting WorkBuddy, trusting the server, loading the extension)
 - **FAIL** — genuinely broken. Exits with code 1 and prints the exact fix command.
 
 Run this before reading any further. Most issues are answered by its output.
@@ -64,18 +64,27 @@ Or just open the extension popup — the status pill reads **Connected**.
 
 ### The browser tools don't appear in WorkBuddy
 
-1. Confirm the config entry exists:
+Work through these in order — the first one is the most common and the least obvious.
+
+1. **Restart WorkBuddy.** WorkBuddy reads `~/.workbuddy-ai/mcp.json` once, at startup. If
+   you registered the bridge while the app was already running, the server is not in its
+   in-memory list: it will not appear under custom connectors, so there is nothing to
+   Trust, and starting a new chat does not help. Fully quit and relaunch, then look again.
+   `npm run doctor` reports this as a `WorkBuddy session` warning.
+2. Confirm the config entry exists:
    ```bash
    cat ~/.workbuddy-ai/mcp.json
    ```
    You should see a `browser-bridge` entry under `mcpServers`.
-2. Re-run the installer if it's missing:
+3. Re-run the installer if it's missing:
    ```bash
    npm run install-mcp
    ```
-3. **Trust the server.** New MCP servers stay disabled until you explicitly trust them:
+4. **Trust the server.** New MCP servers stay disabled until you explicitly trust them:
    WorkBuddy → connector management → custom connectors (top-right) → **Trust** on
    `browser-bridge`.
+5. **Reload the session.** The `browser_*` tools only register once the server is trusted
+   *and* the session reloads. If they are still missing, this is what remains.
 
 ### The MCP server exits immediately
 
@@ -95,9 +104,25 @@ lsof -ti :8766 | xargs kill -9
 
 ### Tools return "Chrome extension is not connected"
 
-The MCP server is up but no extension has dialled in. Load the extension
-(`chrome://extensions` → Load unpacked), then check the popup shows **Connected**.
-Call `browser_status` to confirm.
+The MCP server is up but no extension has dialled in. There are four causes, and from the
+outside they look identical — so check them in this order:
+
+1. **The extension is not loaded.** `chrome://extensions` → **Developer mode** →
+   **Load unpacked** → select the folder containing `manifest.json`. `npm run doctor`
+   prints the exact path to use, and says `not loaded in any ... profile` if this is it.
+2. **It is loaded in a different Chrome profile.** An unpacked extension is only active in
+   the profile that has it loaded. Load it in `Default` but browse in `Profile 12` and the
+   bridge never sees it. `doctor` names the profile it found (`loaded v2.0.0 in Profile 12
+   (Chrome)`) — browse there, or load the extension into the profile you actually use.
+3. **A look-alike extension is the one loaded.** Sibling projects in a shared workspace
+   produce near-identical names — an older Antigravity-only build, for instance. Loading
+   the wrong folder looks like a successful install that simply never connects. `doctor`
+   lists these under `Other extensions`; the folder it prints is the correct one.
+4. **It is loaded but disabled.** Toggle it back on at `chrome://extensions`, then reload
+   the page you want to automate.
+
+Once it is right the popup shows **Connected**, and `browser_status` returns
+`connected: true`.
 
 ### Pinning a specific Node binary
 
