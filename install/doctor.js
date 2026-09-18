@@ -21,7 +21,7 @@ const PROJECT_ROOT = path.resolve(__dirname, "..");
 const MCP_ENTRY = path.join(PROJECT_ROOT, "mcp", "server.js");
 const WORKBUDDY_HOME = path.join(os.homedir(), ".workbuddy-ai");
 const CONFIG_PATH = path.join(WORKBUDDY_HOME, "mcp.json");
-const APP_STARTUP_LOG = path.join(WORKBUDDY_HOME, "logs", "AppStartup.log");
+const APPROVALS_PATH = path.join(WORKBUDDY_HOME, "mcp-approvals.json");
 const LIVE_PORT = 8766;   // where the extension dials in
 const PROBE_PORT = 8788;  // scratch port for testing the MCP server in isolation
 
@@ -257,52 +257,50 @@ function checkChromeExtension(bridgeUp, bridgeConnected) {
   }
 }
 
-// --- WorkBuddy session freshness ----------------------------------------------
+// --- MCP trust ----------------------------------------------------------------
 
-// WorkBuddy reads ~/.workbuddy-ai/mcp.json at startup. If the bridge was
-// registered while the app was already running, the server is not in the
-// in-memory list at all: it never shows up under custom connectors, there is
-// nothing to Trust, and starting a new chat does not help. Only a full restart
-// picks it up. That gap cost a real setup several rounds of confusion.
-function lastAppStart() {
-  let text;
+// Registering the server is not enough: WorkBuddy will not expose an MCP
+// server's tools until it has been explicitly trusted, and the approval is
+// recorded here as `<hash>::<serverName>`. This is the gate that actually
+// blocks first use, and the doctor used to say nothing about it — which left
+// "not trusted yet" looking exactly like "not installed yet".
+//
+// A note for anyone tempted to infer a restart requirement: WorkBuddy resolves
+// MCP servers per conversation, so the config is picked up without restarting
+// the app. What a running conversation does NOT pick up is a newly granted
+// approval — that applies to conversations started afterwards. Hence the
+// advice below to start a new conversation rather than to relaunch.
+function checkTrust() {
+  let approvals;
   try {
-    text = fs.readFileSync(APP_STARTUP_LOG, "utf8");
+    const raw = fs.readFileSync(APPROVALS_PATH, "utf8").trim();
+    approvals = raw ? JSON.parse(raw) : {};
   } catch (_) {
-    return null;
+    return; // not a WorkBuddy install, or nothing recorded yet
   }
 
-  let latest = null;
-  for (const line of text.split("\n")) {
-    const marker = line.indexOf(" [AppStartup]");
-    if (marker === -1) continue;
-    const ms = Date.parse(line.slice(0, marker).trim());
-    if (!Number.isNaN(ms) && (latest === null || ms > latest)) latest = ms;
-  }
-  return latest;
-}
+  if (!approvals || typeof approvals !== "object") return;
+  const keys = Object.keys(approvals);
 
-function checkSessionFreshness() {
-  let configMtime;
-  try {
-    configMtime = fs.statSync(CONFIG_PATH).mtimeMs;
-  } catch (_) {
-    return; // no config yet — checkMcpRegistration already reports that
-  }
-
-  const startedAt = lastAppStart();
-  if (startedAt === null) return; // not a WorkBuddy install, or no startup log
-
-  if (startedAt < configMtime) {
+  if (keys.length === 0) {
     warn(
-      "WorkBuddy session",
-      `running since ${new Date(startedAt).toLocaleString()}, but the MCP config was written later (${new Date(
-        configMtime
-      ).toLocaleString()})`,
-      "Fully quit and relaunch WorkBuddy. It reads mcp.json at startup, so the browser-bridge entry is invisible until then."
+      "MCP trust",
+      "no servers approved yet",
+      "Trust it in WorkBuddy: connector management -> custom connectors -> Trust on browser-bridge."
     );
+    return;
+  }
+
+  // Keys look like "<sha256>::browser-bridge".
+  const names = keys.map((k) => k.split("::").pop());
+  if (names.includes(SERVER_NAME)) {
+    pass("MCP trust", `${SERVER_NAME} approved`);
   } else {
-    pass("WorkBuddy session", "started after the MCP config was written");
+    warn(
+      "MCP trust",
+      `${SERVER_NAME} not approved (approved: ${names.join(", ")})`,
+      "Trust it in WorkBuddy: connector management -> custom connectors -> Trust on browser-bridge."
+    );
   }
 }
 
@@ -431,7 +429,7 @@ async function main() {
   checkNode();
   checkProjectFiles();
   checkMcpRegistration();
-  checkSessionFreshness();
+  checkTrust();
   checkRegistryDrift();
 
   // Does the MCP server actually speak MCP?
@@ -508,14 +506,36 @@ async function main() {
   }
 
   if (warned > 0) {
-    console.log(yellow("  Nothing broken.") + " The remaining warnings are steps only a human can do:");
-    console.log("    1. If 'WorkBuddy session' warned above, fully quit and relaunch WorkBuddy first.");
-    console.log("    2. Trust the MCP server: connector management -> custom connectors -> Trust on browser-bridge.");
-    console.log("    3. Load the extension at chrome://extensions -> Load unpacked, using the path printed above.");
-    console.log("");
-    console.log(dim("  Then re-run this to confirm the extension connects."));
+    // Only surface the human steps that are actually outstanding. Printing them
+    // unconditionally made a fully working install look unfinished.
+    const warnedNames = new Set(results.filter((r) => r.level === "warn").map((r) => r.name));
+    const humanSteps = [];
+
+    if (warnedNames.has("MCP trust")) {
+      humanSteps.push(
+        "Trust the MCP server: connector management -> custom connectors -> Trust on browser-bridge."
+      );
+    }
+    if (warnedNames.has("Chrome extension")) {
+      humanSteps.push(
+        "Load the extension at chrome://extensions -> Load unpacked, using the path printed above."
+      );
+    }
+
+    if (humanSteps.length) {
+      console.log(yellow("  Nothing broken.") + " The remaining warnings are steps only a human can do:");
+      humanSteps.forEach((step, i) => console.log(`    ${i + 1}. ${step}`));
+      console.log("");
+      console.log(dim("  Then start a NEW conversation — a running one does not pick up a newly granted approval."));
+    } else {
+      console.log(
+        yellow("  Nothing broken.") + " Every agent-side check passed — the warnings above are informational."
+      );
+    }
+    console.log(dim("  Blocked anyway? The bridge also speaks plain HTTP on port 8766 — see docs/TROUBLESHOOTING.md."));
   } else {
     console.log(green("  All good. Ask your agent to browse."));
+    console.log(dim("  Tools missing in this conversation? Approvals are not retroactive — start a new one."));
   }
   console.log("");
 

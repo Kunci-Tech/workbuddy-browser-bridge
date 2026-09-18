@@ -66,13 +66,25 @@ function main() {
   console.log(`  args     ${MCP_ENTRY}`);
   console.log(`  status   ${existing ? "updated (was already present)" : "added"}`);
   console.log("");
-  console.log("Next steps:");
-  console.log("  1. Open WorkBuddy and go to the connector management page.");
-  console.log("  2. Find the custom connectors entry at the top-right.");
-  console.log(`  3. Click \"Trust\" on the \"${SERVER_NAME}\" server to enable it.`);
-  console.log("  4. Load the Chrome extension (chrome://extensions -> Load unpacked).");
+  console.log("Next steps — all three are manual, no script can do them:");
   console.log("");
+  console.log(`  1. Trust it. WorkBuddy -> connector management -> custom connectors`);
+  console.log(`     (top-right) -> Trust on \"${SERVER_NAME}\".`);
+  console.log(`     Nothing is exposed until you do this.`);
+  console.log("");
+  console.log(`  2. Load the extension. chrome://extensions -> Developer mode ->`);
+  console.log(`     Load unpacked -> select this folder:`);
+  console.log(`       ${PROJECT_ROOT}`);
+  console.log(`     Load it in the Chrome profile you actually browse in.`);
+  console.log("");
+  console.log(`  3. Start a NEW conversation in WorkBuddy. The browser tools are injected`);
+  console.log(`     when a conversation starts, so one that is already open will not see`);
+  console.log(`     them — however long you wait.`);
+  console.log("");
+  console.log("No restart needed: WorkBuddy resolves this config per conversation.");
   console.log("Then just ask WorkBuddy to browse — it starts the server itself.");
+  console.log("");
+  console.log("Verify any time with:  npm run doctor");
   console.log("");
 }
 

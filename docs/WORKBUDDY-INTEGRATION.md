@@ -49,7 +49,9 @@ That writes this entry into `~/.workbuddy-ai/mcp.json`, keeping any existing ser
 
 Then **Trust** the server: WorkBuddy → connector management → custom connectors (top-right) → Trust on `browser-bridge`.
 
-Finally load the extension: `chrome://extensions` → Developer mode → Load unpacked → select the project folder.
+Then load the extension: `chrome://extensions` → Developer mode → Load unpacked → select the project folder.
+
+Finally, start a **new conversation** — approvals are not retroactive, so the conversation you are already in will not gain the browser tools. No WorkBuddy restart is needed.
 
 ### Verify
 
@@ -57,7 +59,7 @@ Finally load the extension: `chrome://extensions` → Developer mode → Load un
 npm run doctor
 ```
 
-Checks the whole chain and prints a verdict — `PASS` / `WARN` / `FAIL`, with the fix command for anything broken. Before the manual steps above, two `WARN` items are expected. After them, you should see seven `PASS` and zero warnings.
+Checks the whole chain and prints a verdict — `PASS` / `WARN` / `FAIL`, with the fix command for anything broken. Before the manual steps above, three `WARN` items are expected. After them you should see eight `PASS` and zero warnings — unless you have a second unpacked bridge extension loaded, which adds one informational `WARN`.
 
 To have an agent do the entire setup for you, use the copy-paste prompt in [AGENT-SETUP-PROMPT.md](AGENT-SETUP-PROMPT.md).
 
