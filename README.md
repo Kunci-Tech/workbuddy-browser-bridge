@@ -25,13 +25,15 @@ npm run install-mcp && npm run doctor
 
 Then the three things only you can do:
 
-1. **Restart WorkBuddy.** WorkBuddy reads its MCP config at startup, so a server registered while the app is already running does not appear under custom connectors at all — there is nothing to Trust yet. Fully quit and relaunch. If `doctor` prints a `WorkBuddy session` warning, this is why.
-2. **Trust the server** — WorkBuddy → connector management → custom connectors (top-right) → **Trust** on `browser-bridge`.
-3. **Load the extension** — `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the folder you cloned into (the one containing `manifest.json`). `doctor` prints the exact path to use, so copy it from there rather than guessing.
+1. **Trust the server** — WorkBuddy → connector management → custom connectors (top-right) → **Trust** on `browser-bridge`. Nothing is exposed until you do, and `doctor` reports `MCP trust` so you can confirm it landed.
+2. **Load the extension** — `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the folder you cloned into (the one containing `manifest.json`). `doctor` prints the exact path to use, so copy it from there rather than guessing.
+3. **Start a new conversation.** The browser tools are injected per conversation, so one that was already open will not pick up a newly granted approval. This is the step people miss.
 
-Re-run `npm run doctor` and the extension should report as connected. The badge turns green **WOR**.
+Then just ask — *"open google.com"*. `doctor` should report every line as `PASS`, and the badge turns green **WOR** once WorkBuddy spawns the bridge on first use.
 
 > **Chrome profiles matter.** An unpacked extension is only active in the profile that has it loaded. If you browse in a profile you did not load it into, the bridge never sees it. `doctor` reports which profile holds the extension — browse there, or load it into the profile you actually use.
+
+> **A grey `OFF` badge is not an error.** It means the extension is loaded and the bridge is not running *yet*, which is the normal state until WorkBuddy spawns it. See [Troubleshooting](docs/TROUBLESHOOTING.md).
 
 Prefer to have your agent do the whole thing? → **[Install with AI](#install-with-ai)**. Full step-by-step walkthrough → **[Quickstart](#quickstart--install-once-no-terminal)**.
 
@@ -57,22 +59,24 @@ If it is already cloned somewhere on this machine, use that copy instead of clon
    Then read the warnings properly instead of assuming they are all the expected
    "not connected yet" ones. doctor separates "the install is broken" from "the human
    has not finished yet", and names the specific blocker:
-     - "WorkBuddy session" -> the app started before the config was written. It reads
-       mcp.json only at startup, so the server is not listed and cannot be trusted
-       until it is restarted. Tell me to restart, and do not try to work around it.
+     - "MCP trust" -> the server has not been approved yet, so WorkBuddy is not exposing
+       it. This is the usual blocker, and it is not a broken install.
      - "Chrome extension" -> tells you which Chrome profile has the extension loaded,
        or that it is missing, disabled, or that a different bridge extension is loaded.
        Quote the exact path it prints for the Load unpacked step.
      - "Live bridge" -> expected until the server is trusted; it goes away on its own.
 5. Tell me the things only I can do, and wait for my confirmation:
-   a) Fully quit and relaunch WorkBuddy, if doctor warned about the session.
-   b) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
-      click Trust on "browser-bridge".
-   c) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
+   a) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
+      click Trust on "browser-bridge". This is the gate; nothing is exposed until then.
+   b) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
       select the folder doctor printed (the one with manifest.json). It must be loaded
       in the Chrome profile I actually browse in, because an unpacked extension is only
       active in the profile that has it.
-6. After I confirm, run npm run doctor again, then call browser_status. It should report
+6. After I confirm, tell me to start a NEW conversation and call browser_status there.
+   A conversation that was already open does not pick up a newly granted approval. It
+   should report connected: true. If it still does not, do not reinstall anything: the
+   bridge also speaks plain HTTP on port 8766, and docs/TROUBLESHOOTING.md explains how
+   to drive Chrome that way instead.
    connected: true.
 
 Notes:
@@ -93,7 +97,7 @@ Also available as a standalone file: [`docs/AGENT-SETUP-PROMPT.md`](docs/AGENT-S
 
 Those two states look identical to an agent reading raw output, and conflating them is exactly what makes most AI-driven installs go in circles: the agent sees "not connected", assumes it failed, and starts reinstalling things that were already fine.
 
-`doctor` checks the Node version, project files, the MCP registration (including whether the registered path still exists after a move), whether WorkBuddy has been restarted since the config was written, registry drift between `agents/registry.js` and `background.js`, a real MCP handshake against the server, and — by reading Chrome's own profile data — whether the extension is actually loaded, in which profile, and whether it is enabled. Every `FAIL` ships with the command that fixes it. Source: [`install/doctor.js`](install/doctor.js).
+`doctor` checks the Node version, project files, the MCP registration (including whether the registered path still exists after a move), whether the server has actually been trusted, registry drift between `agents/registry.js` and `background.js`, a real MCP handshake against the server, and — by reading Chrome's own profile data — whether the extension is actually loaded, in which profile, and whether it is enabled. Every `FAIL` ships with the command that fixes it. Source: [`install/doctor.js`](install/doctor.js).
 
 ---
 
@@ -578,19 +582,15 @@ npm run install-mcp
 
 This writes one entry into `~/.workbuddy-ai/mcp.json`, preserving any servers already there. Use `BRIDGE_NODE=/path/to/node` if you want to pin a specific Node binary.
 
-### Step 2: Restart WorkBuddy
-
-WorkBuddy reads `mcp.json` once, at startup. If it was already running when you ran `install-mcp`, the `browser-bridge` server is not in its list yet — it will not appear under custom connectors, so there is nothing to trust. Fully quit and relaunch.
-
-`npm run doctor` flags this as a `WorkBuddy session` warning, so you don't have to work it out from scratch.
-
-### Step 3: Trust it in WorkBuddy
+### Step 2: Trust it in WorkBuddy
 
 Open WorkBuddy → connector management → the custom connectors entry at the top-right → click **Trust** on `browser-bridge`.
 
+**No restart needed.** WorkBuddy re-resolves `mcp.json` for every new conversation, so a freshly installed server shows up in the list right away. What is *not* retroactive is trust: the conversation you are sitting in will not gain the browser tools, but the next one will.
+
 From then on WorkBuddy spawns the bridge whenever it needs it.
 
-### Step 4: Load the extension into Chrome
+### Step 3: Load the extension into Chrome
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
@@ -601,13 +601,13 @@ Load it in the profile you actually browse in. An unpacked extension is only act
 
 The badge turns green **WOR** as soon as WorkBuddy's bridge is up.
 
-### Step 5: Just ask
+### Step 4: Just ask
 
 > "Open my Google Ads campaigns tab and screenshot the table."
 
 WorkBuddy calls the browser tools directly — 11 of them, listed below.
 
-### Step 6: Verify (anytime)
+### Step 5: Verify (anytime)
 
 ```bash
 npm run doctor
