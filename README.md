@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-Zero--Dependencies-success.svg)](package.json)
 [![Multi-Agent](https://img.shields.io/badge/Multi--Agent-WorkBuddy%20%7C%20Antigravity%20%7C%20Extensible-purple.svg)](agents/registry.js)
 [![Protocol](https://img.shields.io/badge/Protocol-Chrome%20DevTools%20(CDP)-orange.svg)](https://chromedevtools.github.io/devtools-protocol/)
-[![Tests](https://img.shields.io/badge/Tests-6%20Suites%20Passing-brightgreen.svg)](test/)
+[![Tests](https://img.shields.io/badge/Tests-7%20Suites%20Passing-brightgreen.svg)](test/)
 
 > **Universal visual AI browser controller for WorkBuddy AI, Antigravity IDE, and any extensible AI agent.** Control your Chrome browser with native Chrome DevTools Protocol (CDP), Set-of-Mark (SoM) tagging, animated laser cursor, safety guardrails, and a per-agent system prompt and guide system.
 
@@ -78,7 +78,7 @@ Also available as a standalone file: [`docs/AGENT-SETUP-PROMPT.md`](docs/AGENT-S
 
 Those two states look identical to an agent reading raw output, and conflating them is exactly what makes most AI-driven installs go in circles: the agent sees "not connected", assumes it failed, and starts reinstalling things that were already fine.
 
-`doctor` checks the Node version, project files, the MCP registration (including whether the registered path still exists after a move), registry drift between `agents/registry.js` and `background.js`, a real MCP handshake against the server, and whether Chrome has dialled in. Every `FAIL` ships with the command that fixes it. Source: [`install/doctor.js`](install/doctor.js).
+`doctor` checks the Node version, project files, the MCP registration (including whether the registered path still exists after a move), whether WorkBuddy has been restarted since the config was written, registry drift between `agents/registry.js` and `background.js`, a real MCP handshake against the server, and — by reading Chrome's own profile data — whether the extension is actually loaded, in which profile, and whether it is enabled. Every `FAIL` ships with the command that fixes it. Source: [`install/doctor.js`](install/doctor.js).
 
 ---
 
@@ -771,6 +771,7 @@ workbuddy-browser-bridge/
 │
 ├── install/
 │   ├── install-mcp.js         # Merges browser-bridge into ~/.workbuddy-ai/mcp.json
+│   ├── chrome-profiles.js     # Reads Chrome profiles to find the loaded extension
 │   └── doctor.js              # One-command install health check (npm run doctor)
 │
 ├── test/
@@ -779,7 +780,8 @@ workbuddy-browser-bridge/
 │   ├── features.test.js       # 18 client methods + omnibar
 │   ├── multi-agent.test.js    # Registry + X-Agent-Id routing
 │   ├── mcp.test.js            # MCP protocol handshake + tools
-│   └── mcp-e2e.test.js        # Full MCP → WS → extension round trip
+│   ├── mcp-e2e.test.js        # Full MCP → WS → extension round trip
+│   └── doctor-chrome.test.js  # Chrome profile scanning for the doctor
 │
 ├── docs/
 │   ├── WORKBUDDY-INTEGRATION.md  # MCP setup, REST API, Python/Node examples
