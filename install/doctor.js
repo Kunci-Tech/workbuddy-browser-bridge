@@ -15,9 +15,13 @@ const path = require("path");
 const http = require("http");
 const { spawn } = require("child_process");
 
+const { scanUnpackedExtensions, classify, describe } = require("./chrome-profiles");
+
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const MCP_ENTRY = path.join(PROJECT_ROOT, "mcp", "server.js");
-const CONFIG_PATH = path.join(os.homedir(), ".workbuddy-ai", "mcp.json");
+const WORKBUDDY_HOME = path.join(os.homedir(), ".workbuddy-ai");
+const CONFIG_PATH = path.join(WORKBUDDY_HOME, "mcp.json");
+const APP_STARTUP_LOG = path.join(WORKBUDDY_HOME, "logs", "AppStartup.log");
 const LIVE_PORT = 8766;   // where the extension dials in
 const PROBE_PORT = 8788;  // scratch port for testing the MCP server in isolation
 
@@ -173,6 +177,144 @@ function checkRegistryDrift() {
   }
 }
 
+// --- Chrome extension presence ------------------------------------------------
+
+// The doctor used to have no way to see Chrome at all: it inferred extension
+// state purely from the bridge's /status endpoint. That makes "never loaded",
+// "loaded in a profile you don't have open" and "loaded disabled" look
+// identical, so neither a human nor an agent can tell which fix applies.
+function checkChromeExtension(bridgeUp, bridgeConnected) {
+  const { extensions, browsers } = scanUnpackedExtensions();
+
+  if (browsers.length === 0) {
+    // No Chrome-family browser found. Not a failure of the install — the
+    // extension step belongs to the human, and this may be a headless box.
+    warn(
+      "Chrome extension",
+      "could not find a Chrome profile on this machine",
+      "Load the extension manually: chrome://extensions -> Developer mode -> Load unpacked."
+    );
+    return;
+  }
+
+  const { ours, lookalikes } = classify(extensions, PROJECT_ROOT, projectManifestName());
+  const enabledOurs = ours.filter((e) => e.enabled);
+
+  if (ours.length === 0) {
+    const detail = lookalikes.length
+      ? `not loaded — Chrome has ${lookalikes.length} different unpacked bridge extension(s) instead (${lookalikes
+          .map((e) => `${e.name || "unnamed"} in ${describe(e)}`)
+          .join(", ")})`
+      : `not loaded in any ${browsers.join(" / ")} profile`;
+    warn(
+      "Chrome extension",
+      detail,
+      `chrome://extensions -> Developer mode -> Load unpacked -> select ${PROJECT_ROOT}`
+    );
+    return;
+  }
+
+  if (enabledOurs.length === 0) {
+    warn(
+      "Chrome extension",
+      `loaded but disabled in ${ours.map(describe).join(", ")}`,
+      "Toggle it back on at chrome://extensions, then reload the page you want to automate."
+    );
+    return;
+  }
+
+  const where = enabledOurs.map(describe).join(", ");
+  const version = enabledOurs[0].version ? ` v${enabledOurs[0].version}` : "";
+
+  if (bridgeConnected) {
+    pass("Chrome extension", `connected${version} — loaded in ${where}`);
+  } else if (bridgeUp) {
+    warn(
+      "Chrome extension",
+      `loaded${version} in ${where} but not connected — open a window in that profile`,
+      `The bridge is up on port ${LIVE_PORT}, and Chrome only runs the extension in the profile that has it loaded.`
+    );
+  } else {
+    // No bridge yet: the expected pre-trust state. We can still report whether
+    // the human's half of the setup is already done.
+    const drifted = ours.find((e) => e.samePath === false);
+    const note = drifted ? ` (loaded from ${drifted.path}, not this checkout)` : "";
+    warn(
+      "Chrome extension",
+      `loaded${version} in ${where} — waiting for the bridge${note}`,
+      `Nothing listens on ${LIVE_PORT} yet. WorkBuddy starts the bridge once the server is trusted.`
+    );
+  }
+
+  if (lookalikes.length) {
+    warn(
+      "Other extensions",
+      `${lookalikes.length} unrelated unpacked bridge extension(s) also loaded: ${lookalikes
+        .map((e) => `${e.name || "unnamed"} in ${describe(e)}`)
+        .join(", ")}`,
+      "Harmless on its own, but loading the wrong one is the usual reason 'connected' never appears."
+    );
+  }
+}
+
+// --- WorkBuddy session freshness ----------------------------------------------
+
+// WorkBuddy reads ~/.workbuddy-ai/mcp.json at startup. If the bridge was
+// registered while the app was already running, the server is not in the
+// in-memory list at all: it never shows up under custom connectors, there is
+// nothing to Trust, and starting a new chat does not help. Only a full restart
+// picks it up. That gap cost a real setup several rounds of confusion.
+function lastAppStart() {
+  let text;
+  try {
+    text = fs.readFileSync(APP_STARTUP_LOG, "utf8");
+  } catch (_) {
+    return null;
+  }
+
+  let latest = null;
+  for (const line of text.split("\n")) {
+    const marker = line.indexOf(" [AppStartup]");
+    if (marker === -1) continue;
+    const ms = Date.parse(line.slice(0, marker).trim());
+    if (!Number.isNaN(ms) && (latest === null || ms > latest)) latest = ms;
+  }
+  return latest;
+}
+
+function checkSessionFreshness() {
+  let configMtime;
+  try {
+    configMtime = fs.statSync(CONFIG_PATH).mtimeMs;
+  } catch (_) {
+    return; // no config yet — checkMcpRegistration already reports that
+  }
+
+  const startedAt = lastAppStart();
+  if (startedAt === null) return; // not a WorkBuddy install, or no startup log
+
+  if (startedAt < configMtime) {
+    warn(
+      "WorkBuddy session",
+      `running since ${new Date(startedAt).toLocaleString()}, but the MCP config was written later (${new Date(
+        configMtime
+      ).toLocaleString()})`,
+      "Fully quit and relaunch WorkBuddy. It reads mcp.json at startup, so the browser-bridge entry is invisible until then."
+    );
+  } else {
+    pass("WorkBuddy session", "started after the MCP config was written");
+  }
+}
+
+function projectManifestName() {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, "manifest.json"), "utf8"));
+    return typeof manifest.name === "string" ? manifest.name : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 // Spawn the MCP server on a scratch port and drive a real MCP handshake.
 function probeMcpServer() {
   return new Promise((resolve) => {
@@ -289,6 +431,7 @@ async function main() {
   checkNode();
   checkProjectFiles();
   checkMcpRegistration();
+  checkSessionFreshness();
   checkRegistryDrift();
 
   // Does the MCP server actually speak MCP?
@@ -322,28 +465,23 @@ async function main() {
 
   // Is a live bridge running, and has Chrome dialled in?
   const status = await httpGetStatus(LIVE_PORT);
-  if (!status.reachable) {
+  const bridgeUp = Boolean(status.reachable);
+  const bridgeConnected = Boolean(status.connected);
+
+  if (!bridgeUp) {
     warn(
       "Live bridge",
       `nothing listening on port ${LIVE_PORT}`,
       "Expected before first use — WorkBuddy spawns it once the MCP server is trusted."
     );
-    warn(
-      "Chrome extension",
-      "not connected (no bridge to connect to)",
-      "Load the extension: chrome://extensions -> Developer mode -> Load unpacked."
-    );
-  } else if (status.connected) {
+  } else if (bridgeConnected) {
     pass("Live bridge", `port ${LIVE_PORT}, mode direct`);
-    pass("Chrome extension", "connected");
   } else {
     pass("Live bridge", `port ${LIVE_PORT} reachable`);
-    warn(
-      "Chrome extension",
-      "bridge is up but no extension has connected",
-      "Open Chrome with the extension loaded, then refresh the page you want to automate."
-    );
   }
+
+  // Ask Chrome directly, rather than inferring from the bridge alone.
+  checkChromeExtension(bridgeUp, bridgeConnected);
 
   // --- Report ---
   console.log("");
@@ -370,9 +508,10 @@ async function main() {
   }
 
   if (warned > 0) {
-    console.log(yellow("  Nothing broken.") + " The warnings are the two manual steps:");
-    console.log("    1. Trust the MCP server in WorkBuddy (connector management -> custom connectors -> Trust).");
-    console.log("    2. Load the extension in Chrome (chrome://extensions -> Load unpacked).");
+    console.log(yellow("  Nothing broken.") + " The remaining warnings are steps only a human can do:");
+    console.log("    1. If 'WorkBuddy session' warned above, fully quit and relaunch WorkBuddy first.");
+    console.log("    2. Trust the MCP server: connector management -> custom connectors -> Trust on browser-bridge.");
+    console.log("    3. Load the extension at chrome://extensions -> Load unpacked, using the path printed above.");
     console.log("");
     console.log(dim("  Then re-run this to confirm the extension connects."));
   } else {
