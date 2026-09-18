@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-Zero--Dependencies-success.svg)](package.json)
 [![Multi-Agent](https://img.shields.io/badge/Multi--Agent-WorkBuddy%20%7C%20Antigravity%20%7C%20Extensible-purple.svg)](agents/registry.js)
 [![Protocol](https://img.shields.io/badge/Protocol-Chrome%20DevTools%20(CDP)-orange.svg)](https://chromedevtools.github.io/devtools-protocol/)
-[![Tests](https://img.shields.io/badge/Tests-6%20Suites%20Passing-brightgreen.svg)](test/)
+[![Tests](https://img.shields.io/badge/Tests-7%20Suites%20Passing-brightgreen.svg)](test/)
 
 > **Universal visual AI browser controller for WorkBuddy AI, Antigravity IDE, and any extensible AI agent.** Control your Chrome browser with native Chrome DevTools Protocol (CDP), Set-of-Mark (SoM) tagging, animated laser cursor, safety guardrails, and a per-agent system prompt and guide system.
 
@@ -77,13 +77,14 @@ If it is already cloned somewhere on this machine, use that copy instead of clon
    should report connected: true. If it still does not, do not reinstall anything: the
    bridge also speaks plain HTTP on port 8766, and docs/TROUBLESHOOTING.md explains how
    to drive Chrome that way instead.
+   connected: true.
 
 Notes:
 - Do not start a long-running server yourself. Once the MCP server is trusted, WorkBuddy
   spawns and manages the bridge automatically.
 - The browser tools (browser_navigate, browser_click, browser_screenshot, ...) only become
-  visible after the server is trusted AND the session reloads. If you cannot see them yet,
-  say so instead of assuming the install failed.
+  visible after the server is trusted AND you start a NEW conversation. If you cannot see
+  them yet, say so instead of assuming the install failed.
 - To debug the bridge, run `node mcp/server.js` in the background and read stderr. It must
   never write to stdout, because stdout carries the MCP protocol stream.
 ```
@@ -96,7 +97,7 @@ Also available as a standalone file: [`docs/AGENT-SETUP-PROMPT.md`](docs/AGENT-S
 
 Those two states look identical to an agent reading raw output, and conflating them is exactly what makes most AI-driven installs go in circles: the agent sees "not connected", assumes it failed, and starts reinstalling things that were already fine.
 
-`doctor` checks the Node version, project files, the MCP registration (including whether the registered path still exists after a move), registry drift between `agents/registry.js` and `background.js`, a real MCP handshake against the server, and whether Chrome has dialled in. Every `FAIL` ships with the command that fixes it. Source: [`install/doctor.js`](install/doctor.js).
+`doctor` checks the Node version, project files, the MCP registration (including whether the registered path still exists after a move), whether the server has actually been trusted, registry drift between `agents/registry.js` and `background.js`, a real MCP handshake against the server, and — by reading Chrome's own profile data — whether the extension is actually loaded, in which profile, and whether it is enabled. Every `FAIL` ships with the command that fixes it. Source: [`install/doctor.js`](install/doctor.js).
 
 ---
 
@@ -105,6 +106,9 @@ Those two states look identical to an agent reading raw output, and conflating t
 - [Quick install](#quick-install)
 - [Install with AI](#install-with-ai)
 - [Why Browser Bridge?](#why-browser-bridge)
+  - [What makes this hackathon-worthy](#what-makes-this-hackathon-worthy)
+  - [Bundled Chromium vs. your own Chrome](#bundled-chromium-vs-your-own-chrome)
+  - [Why bundled browsers get blocked at sign-in](#why-bundled-browsers-get-blocked-at-sign-in)
 - [How It Works — The Architecture](#how-it-works--the-architecture)
   - [The Big Picture](#the-big-picture)
   - [Layer 1: The Chrome Extension](#layer-1-the-chrome-extension)
@@ -147,6 +151,57 @@ Every AI agent that needs browser access faces the same tradeoff: pay $200/month
 | **Safety guardrails** | Hover & confirm red alert | No | No | No |
 | **Dependencies** | Zero npm packages | — | — | Dozens |
 | **Cost** | Free & unlimited (MIT) | $20/month | $200/month | Free tool |
+
+### Bundled Chromium vs. your own Chrome
+
+Most local agents ship a browser of their own — a bundled Chromium that the agent
+downloads, launches and drives. That is a perfectly reasonable tool for public pages.
+It falls apart the moment a sign-in is involved.
+
+| | Bundled Chromium (e.g. `agent-browser`) | Browser Bridge |
+| :--- | :--- | :--- |
+| **Which browser** | Its own download (~500 MB), separate profile | The Chrome you already run |
+| **Session state** | None — fresh profile, no cookies | Your cookies, tabs and logins |
+| **Signing in** | Log in from scratch, every session | Already signed in — no login step exists |
+| **OAuth / Google sign-in** | Frequently blocked outright | Never triggered — the session already exists |
+| **CAPTCHA / 2FA** | Dead end | Pauses for a human handshake, then resumes |
+| **What you see** | A screenshot, afterwards | The cursor moving, live in your own window |
+| **Setup** | Zero | Trust + load extension, once |
+| **Blast radius** | Sandboxed — cannot touch your accounts | Your real accounts and real data |
+
+#### Why bundled browsers get blocked at sign-in
+
+A freshly launched Chromium is a browser Google has never seen. It has no history, no
+cookies, and — under most automation frameworks — it announces itself with
+`--enable-automation` and a CDP-driven fingerprint. Google's risk engine reads that
+combination as a new, unattended device and may respond by:
+
+- refusing the sign-in with **"This browser or app may not be secure"**;
+- blocking the **OAuth consent screen** for automated user agents;
+- demanding an **extra verification round** on an account that has been signed in for
+  months on your real browser;
+- failing **passkey / WebAuthn** prompts, which need a platform authenticator a bundled
+  browser does not have.
+
+You can fight this with stealth patches, spoofed user agents and a persisted profile
+directory. It is a permanent maintenance burden, it may breach the terms of service of
+the site you are automating, and it still leaves you typing real credentials into a
+script.
+
+**Browser Bridge avoids the problem entirely: it never logs in.** It attaches to a Chrome
+session that is already authenticated, so no sign-in flow runs, no consent screen is
+reached, and no credential is ever handed to a script. The OAuth tokens you already hold
+are simply *used* — through the browser that legitimately holds them.
+
+#### Rule of thumb
+
+- **Behind a login → use the bridge.** Dashboards, ad platforms, admin panels, analytics,
+  anything with an OAuth flow, 2FA or a passkey.
+- **Public page → either works.** For scraping and screenshots of anonymous content, a
+  bundled browser is lighter, needs no setup, and cannot touch your accounts.
+
+If you are signed in nowhere, the two are equivalent. The moment a session exists, only
+the bridge can use it.
 
 ---
 
@@ -585,7 +640,7 @@ This writes one entry into `~/.workbuddy-ai/mcp.json`, preserving any servers al
 
 Open WorkBuddy → connector management → the custom connectors entry at the top-right → click **Trust** on `browser-bridge`.
 
-This is the gate. An MCP server stays dormant until it is explicitly trusted, however correct the config is — and the approval is what `doctor` reports as `MCP trust`, so you can confirm the click landed.
+**No restart needed.** WorkBuddy re-resolves `mcp.json` for every new conversation, so a freshly installed server shows up in the list right away. What is *not* retroactive is trust: the conversation you are sitting in will not gain the browser tools, but the next one will.
 
 From then on WorkBuddy spawns the bridge whenever it needs it.
 
@@ -604,13 +659,13 @@ The browser tools are injected when a conversation starts, so one that was alrea
 
 A grey **OFF** badge before your first request is normal — it means the extension is loaded and the bridge is not running yet. It turns green **WOR** as soon as WorkBuddy spawns the bridge.
 
-### Step 5: Just ask
+### Step 4: Just ask
 
 > "Open my Google Ads campaigns tab and screenshot the table."
 
 WorkBuddy calls the browser tools directly — 11 of them, listed below.
 
-### Step 6: Verify (anytime)
+### Step 5: Verify (anytime)
 
 ```bash
 npm run doctor
@@ -622,6 +677,8 @@ One command that checks the entire chain and reports a verdict:
   PASS  Node.js            v22.22.2
   PASS  Project files      8 core files present
   PASS  MCP registration   browser-bridge -> /path/to/mcp/server.js
+  WARN  MCP trust          no servers approved yet
+        -> Trust it in WorkBuddy: connector management -> custom connectors -> Trust on browser-bridge.
   PASS  Agent registry     2 agents, ports in sync with background.js
   PASS  MCP server         browser-bridge v2.0.0 — 11 tools, handshake OK
   WARN  Live bridge        nothing listening on port 8766
@@ -629,7 +686,7 @@ One command that checks the entire chain and reports a verdict:
   WARN  Chrome extension   not connected (no bridge to connect to)
         -> Load the extension: chrome://extensions -> Developer mode -> Load unpacked.
 
-  5 passed · 2 warnings · 0 failures
+  5 passed · 3 warnings · 0 failures
 ```
 
 A `WARN` is fine — it just means a manual step hasn't happened yet. A `FAIL` exits with code 1 and tells you the exact command to fix it. Run this first whenever something seems off.
@@ -797,6 +854,7 @@ workbuddy-browser-bridge/
 │
 ├── install/
 │   ├── install-mcp.js         # Merges browser-bridge into ~/.workbuddy-ai/mcp.json
+│   ├── chrome-profiles.js     # Reads Chrome profiles to find the loaded extension
 │   └── doctor.js              # One-command install health check (npm run doctor)
 │
 ├── test/
@@ -805,7 +863,8 @@ workbuddy-browser-bridge/
 │   ├── features.test.js       # 18 client methods + omnibar
 │   ├── multi-agent.test.js    # Registry + X-Agent-Id routing
 │   ├── mcp.test.js            # MCP protocol handshake + tools
-│   └── mcp-e2e.test.js        # Full MCP → WS → extension round trip
+│   ├── mcp-e2e.test.js        # Full MCP → WS → extension round trip
+│   └── doctor-chrome.test.js  # Chrome profile scanning for the doctor
 │
 ├── docs/
 │   ├── WORKBUDDY-INTEGRATION.md  # MCP setup, REST API, Python/Node examples

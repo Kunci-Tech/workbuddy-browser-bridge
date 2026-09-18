@@ -49,8 +49,8 @@ Notes:
 - Do not start a long-running server yourself. Once the MCP server is trusted, WorkBuddy
   spawns and manages the bridge automatically.
 - The browser tools (browser_navigate, browser_click, browser_screenshot, ...) only become
-  visible after the server is trusted AND the session reloads. If you cannot see them yet,
-  say so instead of assuming the install failed.
+  visible after the server is trusted AND you start a NEW conversation. If you cannot see
+  them yet, say so instead of assuming the install failed.
 - To debug the bridge, run `node mcp/server.js` in the background and read stderr. It must
   never write to stdout, because stdout carries the MCP protocol stream.
 ```
@@ -108,7 +108,7 @@ The prompt forbids it and explains why.
 
 ### It warns about the tool-visibility lag
 
-MCP tools only appear after the server is trusted **and** the session reloads. An agent that can't see `browser_navigate` yet might reasonably conclude the install failed. The prompt tells it to report the situation rather than guess.
+MCP tools only appear after the server is trusted **and** you start a new conversation. An agent that can't see `browser_navigate` yet might reasonably conclude the install failed. The prompt tells it to report the situation rather than guess.
 
 ### It protects stdout
 
