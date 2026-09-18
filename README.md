@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-Zero--Dependencies-success.svg)](package.json)
 [![Multi-Agent](https://img.shields.io/badge/Multi--Agent-WorkBuddy%20%7C%20Antigravity%20%7C%20Extensible-purple.svg)](agents/registry.js)
 [![Protocol](https://img.shields.io/badge/Protocol-Chrome%20DevTools%20(CDP)-orange.svg)](https://chromedevtools.github.io/devtools-protocol/)
-[![Tests](https://img.shields.io/badge/Tests-8%20Suites%20Passing-brightgreen.svg)](test/)
+[![Tests](https://img.shields.io/badge/Tests-9%20Suites%20Passing-brightgreen.svg)](test/)
 
 > **Universal visual AI browser controller for WorkBuddy AI, Antigravity IDE, and any extensible AI agent.** Control your Chrome browser with native Chrome DevTools Protocol (CDP), Set-of-Mark (SoM) tagging, animated laser cursor, safety guardrails, and a per-agent system prompt and guide system.
 
