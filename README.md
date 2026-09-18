@@ -78,7 +78,7 @@ Also available as a standalone file: [`docs/AGENT-SETUP-PROMPT.md`](docs/AGENT-S
 
 Those two states look identical to an agent reading raw output, and conflating them is exactly what makes most AI-driven installs go in circles: the agent sees "not connected", assumes it failed, and starts reinstalling things that were already fine.
 
-`doctor` checks the Node version, project files, the MCP registration (including whether the registered path still exists after a move), whether WorkBuddy has been restarted since the config was written, registry drift between `agents/registry.js` and `background.js`, a real MCP handshake against the server, and — by reading Chrome's own profile data — whether the extension is actually loaded, in which profile, and whether it is enabled. Every `FAIL` ships with the command that fixes it. Source: [`install/doctor.js`](install/doctor.js).
+`doctor` checks the Node version, project files, the MCP registration (including whether the registered path still exists after a move), whether the server has actually been trusted, registry drift between `agents/registry.js` and `background.js`, a real MCP handshake against the server, and — by reading Chrome's own profile data — whether the extension is actually loaded, in which profile, and whether it is enabled. Every `FAIL` ships with the command that fixes it. Source: [`install/doctor.js`](install/doctor.js).
 
 ---
 
