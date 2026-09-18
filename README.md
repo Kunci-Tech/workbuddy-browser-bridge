@@ -83,8 +83,8 @@ Notes:
 - Do not start a long-running server yourself. Once the MCP server is trusted, WorkBuddy
   spawns and manages the bridge automatically.
 - The browser tools (browser_navigate, browser_click, browser_screenshot, ...) only become
-  visible after the server is trusted AND the session reloads. If you cannot see them yet,
-  say so instead of assuming the install failed.
+  visible after the server is trusted AND you start a NEW conversation. If you cannot see
+  them yet, say so instead of assuming the install failed.
 - To debug the bridge, run `node mcp/server.js` in the background and read stderr. It must
   never write to stdout, because stdout carries the MCP protocol stream.
 ```
@@ -619,6 +619,8 @@ One command that checks the entire chain and reports a verdict:
   PASS  Node.js            v22.22.2
   PASS  Project files      8 core files present
   PASS  MCP registration   browser-bridge -> /path/to/mcp/server.js
+  WARN  MCP trust          no servers approved yet
+        -> Trust it in WorkBuddy: connector management -> custom connectors -> Trust on browser-bridge.
   PASS  Agent registry     2 agents, ports in sync with background.js
   PASS  MCP server         browser-bridge v2.0.0 — 11 tools, handshake OK
   WARN  Live bridge        nothing listening on port 8766
@@ -626,7 +628,7 @@ One command that checks the entire chain and reports a verdict:
   WARN  Chrome extension   not connected (no bridge to connect to)
         -> Load the extension: chrome://extensions -> Developer mode -> Load unpacked.
 
-  5 passed · 2 warnings · 0 failures
+  5 passed · 3 warnings · 0 failures
 ```
 
 A `WARN` is fine — it just means a manual step hasn't happened yet. A `FAIL` exits with code 1 and tells you the exact command to fix it. Run this first whenever something seems off.
