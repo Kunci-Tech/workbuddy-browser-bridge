@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-Zero--Dependencies-success.svg)](package.json)
 [![Multi-Agent](https://img.shields.io/badge/Multi--Agent-WorkBuddy%20%7C%20Antigravity%20%7C%20Extensible-purple.svg)](agents/registry.js)
 [![Protocol](https://img.shields.io/badge/Protocol-Chrome%20DevTools%20(CDP)-orange.svg)](https://chromedevtools.github.io/devtools-protocol/)
-[![Tests](https://img.shields.io/badge/Tests-8%20Suites%20Passing-brightgreen.svg)](test/)
+[![Tests](https://img.shields.io/badge/Tests-9%20Suites%20Passing-brightgreen.svg)](test/)
 
 > **Universal visual AI browser controller for WorkBuddy AI, Antigravity IDE, and any extensible AI agent.** Control your Chrome browser with native Chrome DevTools Protocol (CDP), Set-of-Mark (SoM) tagging, animated laser cursor, safety guardrails, and a per-agent system prompt and guide system.
 
@@ -809,12 +809,13 @@ Then add a matching entry to the `AGENTS` map in `background.js` (service worker
 npm test
 ```
 
-Runs 8 test suites:
+Runs 9 test suites:
 
 | Suite | What it verifies |
 | :--- | :--- |
 | `sanitize-check.test.js` | No hardcoded paths, API keys, or tokens in any file |
 | `find-element.test.js` | Element finding never measures mid-scroll; safety machinery intact |
+| `wait-for-server.test.js` | The readiness poller waits for a late server and gives up on a dead port |
 | `bridge-api.test.js` | The `/status` endpoint responds correctly |
 | `features.test.js` | All 18 client library methods exist; omnibar prompt works |
 | `multi-agent.test.js` | `/agents` returns both agents; `X-Agent-Id` header routes correctly |
@@ -826,6 +827,10 @@ Runs 8 test suites:
 > stale-coordinate pattern in `content.js`, and runs the extracted `settleScroll` against a
 > fake element to confirm it waits for a scroll to settle. The DOM-dependent behaviour
 > (element selection, occlusion, frames) needs a real browser and is not covered here.
+>
+> `wait-for-server.test.js` guards the helper the server suites start with. Those suites
+> spawn a bridge and must wait for it to bind; polling is what keeps a slow machine from
+> being reported as a broken one.
 
 ---
 
@@ -865,8 +870,11 @@ workbuddy-browser-bridge/
 │   └── doctor.js              # One-command install health check (npm run doctor)
 │
 ├── test/
+│   ├── lib/
+│   │   └── wait-for-server.js # Polls a port until the spawned server binds
 │   ├── sanitize-check.test.js # Credential & path leak audit
 │   ├── find-element.test.js   # Element finding measures only after the scroll settles
+│   ├── wait-for-server.test.js # Guards the readiness poller the suites start with
 │   ├── bridge-api.test.js     # Bridge /status endpoint
 │   ├── features.test.js       # 18 client methods + omnibar
 │   ├── multi-agent.test.js    # Registry + X-Agent-Id routing
