@@ -51,6 +51,16 @@ Then **Trust** the server: WorkBuddy → connector management → custom connect
 
 Finally load the extension: `chrome://extensions` → Developer mode → Load unpacked → select the project folder.
 
+### Verify
+
+```bash
+npm run doctor
+```
+
+Checks the whole chain and prints a verdict — `PASS` / `WARN` / `FAIL`, with the fix command for anything broken. Before the manual steps above, two `WARN` items are expected. After them, you should see seven `PASS` and zero warnings.
+
+To have an agent do the entire setup for you, use the copy-paste prompt in [AGENT-SETUP-PROMPT.md](AGENT-SETUP-PROMPT.md).
+
 ### Use it
 
 Just ask in plain language:

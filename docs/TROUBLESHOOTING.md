@@ -1,5 +1,21 @@
 # Troubleshooting
 
+## Start here
+
+```bash
+npm run doctor
+```
+
+One command that checks the whole chain — Node version, project files, MCP registration, a live MCP handshake, and whether Chrome has connected — then prints a verdict:
+
+- **PASS** — verified working
+- **WARN** — fine, but a manual step hasn't happened yet (trusting the server, loading the extension)
+- **FAIL** — genuinely broken. Exits with code 1 and prints the exact fix command.
+
+Run this before reading any further. Most issues are answered by its output.
+
+---
+
 ## "WebSocket connection to 'ws://127.0.0.1:8766/' failed: net::ERR_CONNECTION_REFUSED"
 
 **This means nothing is listening on port 8766 yet. It is not a bug.**

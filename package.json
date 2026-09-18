@@ -11,6 +11,7 @@
     "start": "node bridge/server.js",
     "mcp": "node mcp/server.js",
     "install-mcp": "node install/install-mcp.js",
+    "doctor": "node install/doctor.js",
     "test": "node test/sanitize-check.test.js && node test/bridge-api.test.js && node test/features.test.js && node test/multi-agent.test.js && node test/mcp.test.js && node test/mcp-e2e.test.js",
     "demo": "node bridge/demo.js",
     "status": "node bridge/test-connection.js"

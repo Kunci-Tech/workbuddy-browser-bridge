@@ -11,8 +11,81 @@
 
 ---
 
+## Quick install
+
+Three commands, then two manual steps.
+
+```bash
+git clone https://github.com/Kunci-Tech/workbuddy-browser-bridge.git
+cd workbuddy-browser-bridge
+npm run install-mcp && npm run doctor
+```
+
+`install-mcp` registers the bridge with WorkBuddy — safe to re-run, and other MCP servers in your config are left untouched. `doctor` verifies the whole chain and tells you exactly what's missing.
+
+Then the two things only you can do:
+
+1. **Trust the server** — WorkBuddy → connector management → custom connectors (top-right) → **Trust** on `browser-bridge`.
+2. **Load the extension** — `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the `workbuddy-browser-bridge` folder.
+
+Re-run `npm run doctor` and the extension should report as connected. The badge turns green **WOR**.
+
+Prefer to have your agent do the whole thing? → **[Install with AI](#install-with-ai)**. Full step-by-step walkthrough → **[Quickstart](#quickstart--install-once-no-terminal)**.
+
+---
+
+## Install with AI
+
+Paste this into WorkBuddy (or any agent with shell access). It runs the setup, verifies it, and hands back only the two steps that need a human:
+
+```text
+Set up Browser Bridge so you can control my Chrome browser directly.
+
+Repo: https://github.com/Kunci-Tech/workbuddy-browser-bridge
+If it is already cloned somewhere on this machine, use that copy instead of cloning again.
+
+1. Check Node.js 18 or newer with `node --version`. If it is older, stop and tell me.
+2. Get the project: git clone https://github.com/Kunci-Tech/workbuddy-browser-bridge.git && cd workbuddy-browser-bridge
+3. Register the MCP server: npm run install-mcp
+   This merges a "browser-bridge" entry into ~/.workbuddy-ai/mcp.json and leaves any
+   other MCP servers untouched. Safe to re-run.
+4. Verify: npm run doctor
+   Report the full output. Fix anything marked FAIL before continuing.
+   The "Live bridge" and "Chrome extension" warnings are expected right now — they are
+   the two manual steps below.
+5. Tell me the two things only I can do, and wait for my confirmation:
+   a) Trust the server — WorkBuddy, connector management, custom connectors (top-right),
+      click Trust on "browser-bridge".
+   b) Load the extension — chrome://extensions, enable Developer mode, Load unpacked,
+      select the workbuddy-browser-bridge folder.
+6. After I confirm both, run npm run doctor again. The extension should show as connected.
+
+Notes:
+- Do not start a long-running server yourself. Once the MCP server is trusted, WorkBuddy
+  spawns and manages the bridge automatically.
+- The browser tools (browser_navigate, browser_click, browser_screenshot, ...) only become
+  visible after the server is trusted AND the session reloads. If you cannot see them yet,
+  say so instead of assuming the install failed.
+- To debug the bridge, run `node mcp/server.js` in the background and read stderr. It must
+  never write to stdout, because stdout carries the MCP protocol stream.
+```
+
+Also available as a standalone file: [`docs/AGENT-SETUP-PROMPT.md`](docs/AGENT-SETUP-PROMPT.md).
+
+### Why the prompt works
+
+`npm run doctor` is the key piece. It gives the agent a single command that returns a **verdict** rather than a wall of logs — so it can tell the difference between *"the install is broken"* and *"the human hasn't clicked Trust yet."*
+
+Those two states look identical to an agent reading raw output, and conflating them is exactly what makes most AI-driven installs go in circles: the agent sees "not connected", assumes it failed, and starts reinstalling things that were already fine.
+
+`doctor` checks the Node version, project files, the MCP registration (including whether the registered path still exists after a move), registry drift between `agents/registry.js` and `background.js`, a real MCP handshake against the server, and whether Chrome has dialled in. Every `FAIL` ships with the command that fixes it. Source: [`install/doctor.js`](install/doctor.js).
+
+---
+
 ## Table of Contents
 
+- [Quick install](#quick-install)
+- [Install with AI](#install-with-ai)
 - [Why Browser Bridge?](#why-browser-bridge)
 - [How It Works — The Architecture](#how-it-works--the-architecture)
   - [The Big Picture](#the-big-picture)
@@ -511,6 +584,30 @@ The badge turns green **WOR** as soon as WorkBuddy's bridge is up.
 
 WorkBuddy calls the browser tools directly — 11 of them, listed below.
 
+### Step 5: Verify (anytime)
+
+```bash
+npm run doctor
+```
+
+One command that checks the entire chain and reports a verdict:
+
+```
+  PASS  Node.js            v22.22.2
+  PASS  Project files      8 core files present
+  PASS  MCP registration   browser-bridge -> /path/to/mcp/server.js
+  PASS  Agent registry     2 agents, ports in sync with background.js
+  PASS  MCP server         browser-bridge v2.0.0 — 11 tools, handshake OK
+  WARN  Live bridge        nothing listening on port 8766
+        -> Expected before first use — WorkBuddy spawns it once the MCP server is trusted.
+  WARN  Chrome extension   not connected (no bridge to connect to)
+        -> Load the extension: chrome://extensions -> Developer mode -> Load unpacked.
+
+  5 passed · 2 warnings · 0 failures
+```
+
+A `WARN` is fine — it just means a manual step hasn't happened yet. A `FAIL` exits with code 1 and tells you the exact command to fix it. Run this first whenever something seems off.
+
 ---
 
 ## Browser Tools Exposed Over MCP
@@ -673,7 +770,8 @@ workbuddy-browser-bridge/
 │   └── server.js              # MCP stdio server + WS hub (spawned by WorkBuddy)
 │
 ├── install/
-│   └── install-mcp.js         # Merges browser-bridge into ~/.workbuddy-ai/mcp.json
+│   ├── install-mcp.js         # Merges browser-bridge into ~/.workbuddy-ai/mcp.json
+│   └── doctor.js              # One-command install health check (npm run doctor)
 │
 ├── test/
 │   ├── sanitize-check.test.js # Credential & path leak audit
@@ -685,7 +783,8 @@ workbuddy-browser-bridge/
 │
 ├── docs/
 │   ├── WORKBUDDY-INTEGRATION.md  # MCP setup, REST API, Python/Node examples
-│   └── TROUBLESHOOTING.md       # Connection errors, MCP issues, badge states
+│   ├── AGENT-SETUP-PROMPT.md     # Copy-paste prompt for AI-driven install
+│   └── TROUBLESHOOTING.md        # Connection errors, MCP issues, badge states
 │
 └── icons/
     ├── icon16.png
