@@ -653,7 +653,11 @@ From then on WorkBuddy spawns the bridge whenever it needs it.
 
 Load it in the profile you actually browse in. An unpacked extension is only active in the profile that has it loaded, and `doctor` reports which profile it found it in.
 
-The badge turns green **WOR** as soon as WorkBuddy's bridge is up.
+### Step 4: Start a new conversation
+
+The browser tools are injected when a conversation starts, so one that was already open when you clicked Trust will not have them. Start a fresh conversation.
+
+A grey **OFF** badge before your first request is normal — it means the extension is loaded and the bridge is not running yet. It turns green **WOR** as soon as WorkBuddy spawns the bridge.
 
 ### Step 4: Just ask
 
