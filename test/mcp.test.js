@@ -1,6 +1,12 @@
 // Test Seam 5: MCP Server Protocol
 // Verifies the server WorkBuddy spawns actually speaks MCP correctly:
 // initialize handshake, tool discovery, and tool invocation.
+//
+// Each step waits for the reply it needs instead of reading a shared map on a
+// fixed clock. The previous version inspected responses at 400/900/1400/2200/
+// 2900ms after spawn; on a loaded machine the initialize reply could miss the
+// 900ms mark, and the suite then reported "No response to initialize" for a
+// server that was working correctly.
 const { spawn } = require("child_process");
 const path = require("path");
 
@@ -19,6 +25,7 @@ proc.stderr.on("data", d => { stderr += d.toString(); });
 
 let stdoutBuffer = "";
 const responses = new Map(); // id -> parsed message
+let wake = null;             // set while a step is waiting for a reply
 
 proc.stdout.on("data", (chunk) => {
   stdoutBuffer += chunk.toString();
@@ -29,7 +36,10 @@ proc.stdout.on("data", (chunk) => {
     if (!line) continue;
     try {
       const msg = JSON.parse(line);
-      if (msg.id !== undefined) responses.set(msg.id, msg);
+      if (msg.id !== undefined) {
+        responses.set(msg.id, msg);
+        if (wake) wake();
+      }
     } catch (_) {
       console.error("Non-JSON on stdout (protocol violation):", line.slice(0, 120));
       cleanup(1);
@@ -54,8 +64,25 @@ function fail(msg) {
 
 proc.on("error", (err) => fail("Failed to start MCP server: " + err.message));
 
-// Wait for the port to bind, then drive the handshake.
-setTimeout(() => {
+// Resolve as soon as the reply carrying this id arrives. The deadline only
+// bounds a genuine hang - it is not what decides when we move on.
+function awaitResponse(id, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    if (responses.has(id)) return resolve(responses.get(id));
+    const timer = setTimeout(() => {
+      wake = null;
+      reject(new Error(`timed out after ${timeoutMs}ms waiting for response id ${id}`));
+    }, timeoutMs);
+    wake = () => {
+      if (!responses.has(id)) return;
+      clearTimeout(timer);
+      wake = null;
+      resolve(responses.get(id));
+    };
+  });
+}
+
+async function main() {
   // 1. initialize
   send({
     jsonrpc: "2.0",
@@ -63,11 +90,8 @@ setTimeout(() => {
     method: "initialize",
     params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "1.0.0" } }
   });
-}, 400);
 
-setTimeout(() => {
-  const init = responses.get(1);
-  if (!init) return fail("No response to initialize");
+  const init = await awaitResponse(1);
   if (!init.result) return fail("initialize returned an error: " + JSON.stringify(init.error));
   if (!init.result.serverInfo || init.result.serverInfo.name !== "browser-bridge") {
     return fail("Unexpected serverInfo: " + JSON.stringify(init.result.serverInfo));
@@ -83,11 +107,8 @@ setTimeout(() => {
 
   // 2. tools/list
   send({ jsonrpc: "2.0", id: 2, method: "tools/list" });
-}, 900);
 
-setTimeout(() => {
-  const list = responses.get(2);
-  if (!list) return fail("No response to tools/list");
+  const list = await awaitResponse(2);
   if (!list.result || !Array.isArray(list.result.tools)) {
     return fail("tools/list did not return a tools array");
   }
@@ -116,11 +137,8 @@ setTimeout(() => {
   // 3. tools/call — with no extension connected this must fail gracefully
   //    (isError in-band, not a protocol-level crash).
   send({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "browser_status", arguments: {} } });
-}, 1400);
 
-setTimeout(() => {
-  const call = responses.get(3);
-  if (!call) return fail("No response to tools/call");
+  const call = await awaitResponse(3);
   if (call.error) return fail("tools/call returned a protocol error: " + JSON.stringify(call.error));
   if (!call.result || !Array.isArray(call.result.content)) {
     return fail("tools/call result missing content array");
@@ -132,11 +150,8 @@ setTimeout(() => {
 
   // 4. Unknown method must produce a JSON-RPC error, not silence.
   send({ jsonrpc: "2.0", id: 4, method: "nonexistent/method" });
-}, 2200);
 
-setTimeout(() => {
-  const bad = responses.get(4);
-  if (!bad) return fail("No response to unknown method");
+  const bad = await awaitResponse(4);
   if (!bad.error || bad.error.code !== -32601) {
     return fail("Unknown method should return -32601, got: " + JSON.stringify(bad));
   }
@@ -144,6 +159,10 @@ setTimeout(() => {
 
   console.log("\nTest Seam 5: MCP Server Protocol passed.\n");
   cleanup(0);
-}, 2900);
+}
 
-setTimeout(() => fail("Test timed out"), 6000);
+// Backstop only: every step above has its own deadline, so this should never be
+// the thing that fires.
+setTimeout(() => fail("Test timed out"), 30000);
+
+main().catch((err) => fail(err.message));

@@ -2,6 +2,7 @@
 const { spawn } = require("child_process");
 const http = require("http");
 const path = require("path");
+const { waitForPort } = require("./lib/wait-for-server");
 
 const TEST_PORT = 8999;
 const serverPath = path.resolve(__dirname, "../bridge/server.js");
@@ -27,7 +28,22 @@ serverProcess.on("error", (err) => {
   cleanup(1);
 });
 
-setTimeout(() => {
+// Wait for the child to bind the port instead of guessing with a sleep. A fixed
+// delay turns "this machine was busy for 600ms" into "the server is broken",
+// because a refused connection looks exactly like a real regression.
+waitForPort(TEST_PORT).then((ready) => {
+  if (!ready) {
+    console.error(`Bridge server never listened on port ${TEST_PORT}`);
+    console.error("Server output:\n", serverOutput);
+    return cleanup(1);
+  }
+
+  // Startup is proven, so the watchdog now measures the request only.
+  setTimeout(() => {
+    console.error("Test timed out waiting for server response");
+    cleanup(1);
+  }, 4000);
+
   const req = http.get(`http://127.0.0.1:${TEST_PORT}/status`, (res) => {
     let rawData = "";
     res.on("data", chunk => rawData += chunk);
@@ -63,9 +79,4 @@ setTimeout(() => {
     console.error("Server output:\n", serverOutput);
     cleanup(1);
   });
-}, 500);
-
-setTimeout(() => {
-  console.error("Test timed out waiting for server response");
-  cleanup(1);
-}, 4000);
+});
