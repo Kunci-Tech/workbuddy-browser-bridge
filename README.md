@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-Zero--Dependencies-success.svg)](package.json)
 [![Multi-Agent](https://img.shields.io/badge/Multi--Agent-WorkBuddy%20%7C%20Antigravity%20%7C%20Extensible-purple.svg)](agents/registry.js)
 [![Protocol](https://img.shields.io/badge/Protocol-Chrome%20DevTools%20(CDP)-orange.svg)](https://chromedevtools.github.io/devtools-protocol/)
-[![Tests](https://img.shields.io/badge/Tests-7%20Suites%20Passing-brightgreen.svg)](test/)
+[![Tests](https://img.shields.io/badge/Tests-8%20Suites%20Passing-brightgreen.svg)](test/)
 
 > **Universal visual AI browser controller for WorkBuddy AI, Antigravity IDE, and any extensible AI agent.** Control your Chrome browser with native Chrome DevTools Protocol (CDP), Set-of-Mark (SoM) tagging, animated laser cursor, safety guardrails, and a per-agent system prompt and guide system.
 
@@ -809,16 +809,23 @@ Then add a matching entry to the `AGENTS` map in `background.js` (service worker
 npm test
 ```
 
-Runs 6 test suites:
+Runs 8 test suites:
 
 | Suite | What it verifies |
 | :--- | :--- |
 | `sanitize-check.test.js` | No hardcoded paths, API keys, or tokens in any file |
+| `find-element.test.js` | Element finding never measures mid-scroll; safety machinery intact |
 | `bridge-api.test.js` | The `/status` endpoint responds correctly |
 | `features.test.js` | All 18 client library methods exist; omnibar prompt works |
 | `multi-agent.test.js` | `/agents` returns both agents; `X-Agent-Id` header routes correctly |
 | `mcp.test.js` | MCP initialize handshake, tools/list (11 tools), tools/call, unknown method → -32601 |
-| `mcp-e2e.test.js` | Full chain: MCP → WebSocket → fake extension → response back. Event-driven, no fixed timers. |
+| `mcp-e2e.test.js` | Full chain: MCP → WebSocket → fake extension → response back. Waits on real socket events, not fixed sleeps. |
+| `doctor-chrome.test.js` | Chrome profile scanning finds our extension and flags look-alikes |
+
+> `find-element.test.js` is a static + runtime guard, not a browser test: it forbids the
+> stale-coordinate pattern in `content.js`, and runs the extracted `settleScroll` against a
+> fake element to confirm it waits for a scroll to settle. The DOM-dependent behaviour
+> (element selection, occlusion, frames) needs a real browser and is not covered here.
 
 ---
 
@@ -859,6 +866,7 @@ workbuddy-browser-bridge/
 │
 ├── test/
 │   ├── sanitize-check.test.js # Credential & path leak audit
+│   ├── find-element.test.js   # Element finding measures only after the scroll settles
 │   ├── bridge-api.test.js     # Bridge /status endpoint
 │   ├── features.test.js       # 18 client methods + omnibar
 │   ├── multi-agent.test.js    # Registry + X-Agent-Id routing

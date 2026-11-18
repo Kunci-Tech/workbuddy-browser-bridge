@@ -156,12 +156,12 @@ const TOOLS = [
   },
   {
     name: "browser_click",
-    description: "Click an element. Prefer badgeId (from browser_tag_elements) for reliability. You can also target by visible text, CSS selector, or explicit x/y coordinates. High-stakes targets (delete, pay, transfer) pause for human approval unless force is true.",
+    description: "Click an element. Prefer badgeId (from browser_tag_elements) for a target already on screen - it is a direct element reference. Badges only cover the current viewport, so for anything below the fold use text instead: text targeting scrolls the element into view, waits for the scroll to settle, and verifies the click point actually reaches the element before clicking. CSS selector and explicit x/y are also accepted. High-stakes targets (delete, pay, transfer) pause for human approval unless force is true.",
     inputSchema: {
       type: "object",
       properties: {
-        badgeId: { type: "number", description: "Badge number from browser_tag_elements (most reliable)" },
-        text: { type: "string", description: "Visible text of the element to click" },
+        badgeId: { type: "number", description: "Badge number from browser_tag_elements (on-screen targets only)" },
+        text: { type: "string", description: "Visible text of the element to click. Scrolls it into view and verifies the click point before clicking, so it works below the fold." },
         selector: { type: "string", description: "CSS selector for the element" },
         x: { type: "number", description: "Viewport x coordinate" },
         y: { type: "number", description: "Viewport y coordinate" },
